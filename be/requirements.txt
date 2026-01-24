@@ -1,12 +1,23 @@
-langchain-ollama
-langgraph
-qdrant-client
-redis
-minio
-pydantic
+# --- Web Server ---
 fastapi
-uvicorn
-psycopg2-binary
-python-dotenv
-pymupdf
+uvicorn[standard]
 python-multipart
+pydantic
+python-dotenv
+
+# --- Databases & Persistence ---
+sqlalchemy           # Required for your Session/Depends(get_db) logic
+psycopg2-binary      # Postgres driver
+minio                # Object storage (MinIO)
+redis                # Caching/Session storage
+qdrant-client        # Vector database
+
+# --- AI & Orchestration ---
+langchain            # Core framework
+langchain-ollama     # Local LLM/Embedding support
+langgraph            # Agentic state machine logic
+pymupdf              # PDF parsing (used for file processing)
+langchain-text-splitters # Needed to chunk text before Qdrant storage
+
+# --- Utilities ---
+httpx                # Required for async API calls within FastAPI
