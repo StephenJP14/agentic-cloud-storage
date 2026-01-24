@@ -2,3 +2,4 @@
 /minio_data/*
 /qdrant_data/*
 .DS_Store
+.vscode
