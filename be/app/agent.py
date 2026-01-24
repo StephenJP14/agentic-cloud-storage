@@ -35,7 +35,12 @@ print(f"🔌 Connecting to Backend at {WINDOWS_IP}...")
 # 2. Setup Vector DB
 client = QdrantClient(url=QDRANT_URL)
 embeddings = OllamaEmbeddings(base_url=OLLAMA_URL, model="bge-m3")
-vector_store = QdrantVectorStore(client=client, collection_name="user_docs", embedding=embeddings)
+vector_store = QdrantVectorStore(
+    client=client, 
+    collection_name="user_docs", 
+    embedding=embeddings,
+    content_payload_key="text"  # <--- CRITICAL FIX: Match your ingestion key!
+)
 
 # ---------------------------------------------------------
 # TOOLS
@@ -126,6 +131,7 @@ def router_node(state: AgentState):
 def search_node(state: AgentState):
     last_message = state["messages"][-1].content
     result = search_documents.invoke(last_message)
+    print("Search Results:", result)
     return {
         "messages": [
             SystemMessage(content=f"DOCUMENT CONTEXT FROM DATABASE:\n{result}")
@@ -142,8 +148,51 @@ def email_node(state: AgentState):
     }
 
 def answer_node(state: AgentState):
-    response = llm.invoke(state["messages"])
+    messages = state["messages"]
+    last_message = messages[-1]
+
+    # CHECK: Is this a RAG response (Document Context)?
+    if isinstance(last_message, SystemMessage) and "DOCUMENT CONTEXT" in last_message.content:
+        
+        # 1. SAFELY Find the last User Question
+        # Iterate backwards to find the first HumanMessage
+        user_question = "Summary" # Default
+        for msg in reversed(messages):
+            if isinstance(msg, HumanMessage):
+                user_question = msg.content
+                break
+        
+        context_data = last_message.content
+        
+        print(f"   [GENERATE] 📝 Analyzing Context for question: '{user_question}'")
+        
+        # 2. BETTER PROMPT for Llama 3
+        # We explicitly tell it how to read a document (CVs usually have names at the top).
+        rag_prompt = f"""You are an intelligent document analyst.
+        
+        USER QUESTION: 
+        "{user_question}"
+
+        DOCUMENT CONTENT (Retrieved from Database):
+        --------------------------------------------------
+        {context_data}
+        --------------------------------------------------
+
+        INSTRUCTIONS:
+        1. Analyze the Document Content above carefully.
+        2. Answer the User Question using the information in the document.
+        3. NOTE: If the document looks like a CV or Resume, the Name is usually at the very top, and Contact Info is near it.
+        4. If the answer is truly missing, say "I couldn't find that information in the document."
+        """
+        
+        # 3. Invoke LLM with this focused prompt
+        response = llm.invoke([HumanMessage(content=rag_prompt)])
+        return {"messages": [response]}
+
+    # FALLBACK: Normal Chitchat
+    response = llm.invoke(messages)
     return {"messages": [response]}
+
 
 # ---------------------------------------------------------
 # GRAPH SETUP
@@ -170,42 +219,51 @@ workflow.add_edge("search", "generate")
 workflow.add_edge("email", "generate")
 workflow.add_edge("generate", END)
 
-# ---------------------------------------------------------
-# MAIN LOOP (FIXED: ADDED SETUP())
-# ---------------------------------------------------------
-if __name__ == "__main__":
-    print(f"⚡ Connecting to Redis at {REDIS_URL}...")
 
-    # Open connection
-    with RedisSaver.from_conn_string(REDIS_URL) as checkpointer:
-        
-        # 1. INITIALIZE INDICES (Crucial Step!)
-        # This creates the 'checkpoint_write' and 'checkpoint_migrations' indices in Redis
-        print("🔧 Setting up Redis Indices...")
-        checkpointer.setup() 
+# ---------------------------------------------------------
+# EXPORT FUNCTION
+# ---------------------------------------------------------
+# This function allows main.py to create the agent with a specific checkpointer
+def get_graph_workflow():
+    return workflow
 
-        # 2. Compile graph with the ready checkpointer
-        app = workflow.compile(checkpointer=checkpointer)
+
+# # ---------------------------------------------------------
+# # MAIN LOOP (FIXED: ADDED SETUP())
+# # ---------------------------------------------------------
+# if __name__ == "__main__":
+#     print(f"⚡ Connecting to Redis at {REDIS_URL}...")
+
+#     # Open connection
+#     with RedisSaver.from_conn_string(REDIS_URL) as checkpointer:
         
-        print("🤖 Agent V5 (With Redis Memory) Online.")
+#         # 1. INITIALIZE INDICES (Crucial Step!)
+#         # This creates the 'checkpoint_write' and 'checkpoint_migrations' indices in Redis
+#         print("🔧 Setting up Redis Indices...")
+#         checkpointer.setup() 
+
+#         # 2. Compile graph with the ready checkpointer
+#         app = workflow.compile(checkpointer=checkpointer)
         
-        config = {"configurable": {"thread_id": "stephen_session_1"}}
+#         print("🤖 Agent V5 (With Redis Memory) Online.")
         
-        while True:
-            try:
-                user_input = input("\nYou: ")
-                if user_input.lower() in ["quit", "exit"]:
-                    break
+#         config = {"configurable": {"thread_id": "stephen_session_1"}}
+        
+#         while True:
+#             try:
+#                 user_input = input("\nYou: ")
+#                 if user_input.lower() in ["quit", "exit"]:
+#                     break
                     
-                for event in app.stream(
-                    {"messages": [HumanMessage(content=user_input)]}, 
-                    config=config
-                ):
-                    if "generate" in event:
-                        ai_reply = event['generate']['messages'][-1].content
-                        print(f"AI: {ai_reply}")
-            except Exception as e:
-                print(f"❌ Error: {e}")
-                import traceback
-                traceback.print_exc()
-                break
+#                 for event in app.stream(
+#                     {"messages": [HumanMessage(content=user_input)]}, 
+#                     config=config
+#                 ):
+#                     if "generate" in event:
+#                         ai_reply = event['generate']['messages'][-1].content
+#                         print(f"AI: {ai_reply}")
+#             except Exception as e:
+#                 print(f"❌ Error: {e}")
+#                 import traceback
+#                 traceback.print_exc()
+#                 break
