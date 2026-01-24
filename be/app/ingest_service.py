@@ -147,15 +147,15 @@ def ingest_file(file_path, user_id="u_default"):
     )
     print(f"✅ Success! {filename} is now searchable.")
 
-# ---------------------------------------------------------
-# TEST RUN (Run this file directly)
-# ---------------------------------------------------------
-if __name__ == "__main__":
-    # Create a dummy PDF path or use a real one
-    # You can put a file named "test.pdf" in the same folder to test
-    target_pdf = "/Volumes/MacExternal/Dev/Skripsi/be/app/test.pdf" 
+# # ---------------------------------------------------------
+# # TEST RUN (Run this file directly)
+# # ---------------------------------------------------------
+# if __name__ == "__main__":
+#     # Create a dummy PDF path or use a real one
+#     # You can put a file named "test.pdf" in the same folder to test
+#     target_pdf = "/Volumes/MacExternal/Dev/Skripsi/be/app/test.pdf" 
     
-    if os.path.exists(target_pdf):
-        ingest_file(target_pdf)
-    else:
-        print(f"❌ File {target_pdf} not found. Put a PDF here to test.")
+#     if os.path.exists(target_pdf):
+#         ingest_file(target_pdf)
+#     else:
+#         print(f"❌ File {target_pdf} not found. Put a PDF here to test.")
