@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { mockFiles, DriveFile } from './data';
 import FileUploader from './file-uploader';
+import Chat from './chat';
 
 export default function Dashboard() {
     const [files, setFiles] = useState<DriveFile[]>(mockFiles);
@@ -9,6 +10,7 @@ export default function Dashboard() {
     const [dragActive, setDragActive] = useState(false);
     const [droppedFile, setDroppedFile] = useState<File | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isChatOpen, setIsChatOpen] = useState(false); // New state
 
     const fetchFiles = async () => {
         try {
@@ -69,7 +71,7 @@ export default function Dashboard() {
 
     return (
         <div
-            className="flex h-screen bg-white font-sans text-gray-700 relative"
+            className="flex h-screen bg-white font-sans text-gray-700 relative overflow-hidden"
             onDragEnter={handleDrag}
             onDragOver={handleDrag}
             onDrop={handleDrop}
@@ -106,12 +108,21 @@ export default function Dashboard() {
                 </nav>
             </aside>
 
-            {/* Main Content */}
-            <main className="flex-1 flex flex-col overflow-hidden">
-                <header className="h-16 border-b border-gray-200 flex items-center px-6 justify-between">
+            {/* 2. Main Content (The middle section) */}
+            <main className="flex-1 flex flex-col min-w-0 border-r border-gray-200">
+                <header className="h-16 border-b border-gray-200 flex items-center px-6 justify-between gap-4">
                     <div className="flex-1 max-w-2xl">
                         <input type="text" placeholder="Search in Drive" className="w-full bg-gray-100 rounded-full px-6 py-2 outline-none focus:bg-white focus:ring-1 focus:ring-gray-300 transition-all" />
                     </div>
+
+                    {/* Chat Toggle Button */}
+                    <button
+                        onClick={() => setIsChatOpen(!isChatOpen)}
+                        className={`py-2 px-4 rounded-full transition-colors ${isChatOpen ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-500'}`}
+                        title="Chat with your files"
+                    >
+                        Chat 💬
+                    </button>
                 </header>
 
                 <div className="p-6 overflow-y-auto">
@@ -137,6 +148,13 @@ export default function Dashboard() {
                     </div>
                 </div>
             </main>
+
+            {/* 3. The New Chat Component */}
+            <Chat
+                isOpen={isChatOpen}
+                onClose={() => setIsChatOpen(false)}
+                fileCount={files.length}
+            />
 
             {/* Modal for FileUploader */}
             {isUploaderOpen && (
