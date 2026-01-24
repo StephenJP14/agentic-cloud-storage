@@ -7,8 +7,6 @@ export default function Dashboard() {
     const [files] = useState<DriveFile[]>(mockFiles);
     const [isUploaderOpen, setIsUploaderOpen] = useState(false);
     const [dragActive, setDragActive] = useState(false);
-
-    // This ref allows us to pass the dropped file into the FileUploader
     const [droppedFile, setDroppedFile] = useState<File | null>(null);
 
     const handleDrag = (e: React.DragEvent) => {
@@ -66,7 +64,7 @@ export default function Dashboard() {
 
                 <button
                     onClick={() => { setDroppedFile(null); setIsUploaderOpen(true); }}
-                    className="flex items-center gap-3 px-5 py-3 bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow mb-6 text-sm font-medium w-fit"
+                    className="w-full flex items-center gap-3 px-5 py-3 bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow mb-6 text-sm font-medium"
                 >
                     <span className="text-2xl text-blue-600">+</span> New
                 </button>

@@ -2,6 +2,10 @@ from fastapi import FastAPI, UploadFile, File
 
 app = FastAPI()
 
+@app.get("/")
+async def ping():
+    return 'pong'
+
 @app.post("/upload/")
 async def upload_file(file: UploadFile = File(...)):
     # You can access metadata here
