@@ -162,7 +162,7 @@ export default function Dashboard() {
                     className="fixed w-full inset-0 z-[60] flex items-center justify-center bg-black/40"
                     onClick={() => setIsUploaderOpen(false)} // Close when clicking background
                 >
-                    <div className='w-full' onClick={(e) => e.stopPropagation()}> {/* Prevents closing when clicking uploader */}
+                    <div className='' onClick={(e) => e.stopPropagation()}> {/* Prevents closing when clicking uploader */}
                         <FileUploader
                             initialFile={droppedFile}
                             onComplete={() => {

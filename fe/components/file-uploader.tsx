@@ -89,8 +89,8 @@ export default function FileUploader({ initialFile, onComplete }: Props) {
     };
 
     return (
-        <div className='flex flex-col items-center justify-center w-full min-h-screen bg-gray-50/10 p-4'>
-            <div className='w-full max-w-md bg-white p-8 rounded-xl shadow-sm border border-gray-200'>
+        <div className='flex flex-col items-center justify-center w-full min-h-screen p-4'>
+            <div className='w-120 bg-white p-8 rounded-xl shadow-sm border border-gray-200'>
                 <h2 className='text-xl font-bold mb-4 text-gray-800'>Upload Document</h2>
 
                 <form
