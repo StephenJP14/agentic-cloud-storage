@@ -2,6 +2,12 @@ import os
 from typing import TypedDict, Literal, Annotated
 from dotenv import load_dotenv
 
+# ---------------------------------------------------------
+# NEW IMPORTS FOR REDIS PERSISTENCE
+# ---------------------------------------------------------
+from langgraph.checkpoint.redis import RedisSaver
+from redis import Redis
+
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
@@ -12,11 +18,19 @@ from langchain_core.tools import tool
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
-# 1. Load Config
+# 1. Load Config & Construct URLs
 load_dotenv()
 WINDOWS_IP = os.getenv("WINDOWS_IP")
-OLLAMA_URL = os.getenv("OLLAMA_BASE_URL")
-QDRANT_URL = os.getenv("QDRANT_URL")
+OLLAMA_PORT = os.getenv("OLLAMA_PORT", "11434")
+QDRANT_PORT = os.getenv("QDRANT_PORT", "6333")
+REDIS_PORT = os.getenv("REDIS_PORT", "6379")
+
+# Construct URLs dynamically so we don't depend on .env substitution
+OLLAMA_URL = f"http://{WINDOWS_IP}:{OLLAMA_PORT}"
+QDRANT_URL = f"http://{WINDOWS_IP}:{QDRANT_PORT}"
+REDIS_URL = f"redis://{WINDOWS_IP}:{REDIS_PORT}"
+
+print(f"🔌 Connecting to Backend at {WINDOWS_IP}...")
 
 # 2. Setup Vector DB
 client = QdrantClient(url=QDRANT_URL)
@@ -44,11 +58,10 @@ def send_email(recipient: str, subject: str, body: str):
 # ---------------------------------------------------------
 # MODELS
 # ---------------------------------------------------------
-# Gunakan Temperature 0 agar konsisten
 llm = ChatOllama(base_url=OLLAMA_URL, model="llama3.1:8b", temperature=0)
 
 # ---------------------------------------------------------
-# ROUTER (Updated with Context)
+# ROUTER
 # ---------------------------------------------------------
 class RouteQuery(BaseModel):
     datasource: Literal["vectorstore", "email_tool", "chitchat"] = Field(
@@ -63,10 +76,6 @@ ROUTING RULES:
 1. 'vectorstore': Questions about uploaded files, CV, specific identity data, or summarizing documents.
 2. 'email_tool': Explicit commands to send email.
 3. 'chitchat': Everything else (Greetings, General Knowledge, Follow-up questions about previous chitchat).
-
-Example:
-- History: "What is REST API?" -> User: "How does it work?" => 'chitchat' (Contextual follow-up)
-- History: "Search for invoice" -> User: "Email it to boss" => 'email_tool' (Contextual action)
 """
 
 router_prompt = ChatPromptTemplate.from_messages([
@@ -77,14 +86,13 @@ router_prompt = ChatPromptTemplate.from_messages([
 router_chain = router_prompt | llm.with_structured_output(RouteQuery)
 
 # ---------------------------------------------------------
-# STATE & HELPER
+# STATE
 # ---------------------------------------------------------
 class AgentState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     context: str
 
 def get_history_text(messages):
-    # Ambil 5 pesan terakhir saja agar prompt tidak kepenuhan
     recent = messages[-5:] 
     text = ""
     for msg in recent:
@@ -99,12 +107,11 @@ def get_history_text(messages):
 def router_node(state: AgentState):
     messages = state["messages"]
     last_message = messages[-1].content
-    history_text = get_history_text(messages[:-1]) # History tanpa pesan terakhir
+    history_text = get_history_text(messages[:-1]) 
     
-    print(f"\n🧠 Router seeing: '{last_message}' (with history context)")
+    print(f"\n🧠 Router seeing: '{last_message}'")
     
     try:
-        # Panggil router dengan History + Pesan Baru
         decision = router_chain.invoke({
             "history": history_text,
             "question": last_message
@@ -119,7 +126,6 @@ def router_node(state: AgentState):
 def search_node(state: AgentState):
     last_message = state["messages"][-1].content
     result = search_documents.invoke(last_message)
-    # Gunakan SystemMessage untuk menyuntikkan konteks dokumen ke otak LLM
     return {
         "messages": [
             SystemMessage(content=f"DOCUMENT CONTEXT FROM DATABASE:\n{result}")
@@ -127,7 +133,6 @@ def search_node(state: AgentState):
     }
 
 def email_node(state: AgentState):
-    # Simulasi: Ambil email dari history jika user bilang "kirim ke dia"
     last_message = state["messages"][-1].content
     res = send_email.invoke({"recipient": "admin@test.com", "subject": "Action", "body": last_message})
     return {
@@ -137,10 +142,6 @@ def email_node(state: AgentState):
     }
 
 def answer_node(state: AgentState):
-    # LLM akan melihat:
-    # 1. History Chat
-    # 2. Pesan User Terakhir
-    # 3. Hasil Tool (jika ada, dimasukkan sebagai SystemMessage di node sebelumnya)
     response = llm.invoke(state["messages"])
     return {"messages": [response]}
 
@@ -169,31 +170,42 @@ workflow.add_edge("search", "generate")
 workflow.add_edge("email", "generate")
 workflow.add_edge("generate", END)
 
-# MEMORY CHECKPOINTER (Agar state tersimpan antar input)
-from langgraph.checkpoint.memory import MemorySaver
-memory = MemorySaver()
-
-app = workflow.compile(checkpointer=memory)
-
 # ---------------------------------------------------------
-# MAIN LOOP
+# MAIN LOOP (FIXED: ADDED SETUP())
 # ---------------------------------------------------------
 if __name__ == "__main__":
-    print("🤖 Agent V4 (Context Aware) Online.")
-    
-    # Thread ID unik untuk sesi ini
-    config = {"configurable": {"thread_id": "session_1"}}
-    
-    while True:
-        user_input = input("\nYou: ")
-        if user_input.lower() in ["quit", "exit"]:
-            break
-            
-        # Stream output
-        for event in app.stream(
-            {"messages": [HumanMessage(content=user_input)]}, 
-            config=config
-        ):
-            if "generate" in event:
-                ai_reply = event['generate']['messages'][-1].content
-                print(f"AI: {ai_reply}")
+    print(f"⚡ Connecting to Redis at {REDIS_URL}...")
+
+    # Open connection
+    with RedisSaver.from_conn_string(REDIS_URL) as checkpointer:
+        
+        # 1. INITIALIZE INDICES (Crucial Step!)
+        # This creates the 'checkpoint_write' and 'checkpoint_migrations' indices in Redis
+        print("🔧 Setting up Redis Indices...")
+        checkpointer.setup() 
+
+        # 2. Compile graph with the ready checkpointer
+        app = workflow.compile(checkpointer=checkpointer)
+        
+        print("🤖 Agent V5 (With Redis Memory) Online.")
+        
+        config = {"configurable": {"thread_id": "stephen_session_1"}}
+        
+        while True:
+            try:
+                user_input = input("\nYou: ")
+                if user_input.lower() in ["quit", "exit"]:
+                    break
+                    
+                for event in app.stream(
+                    {"messages": [HumanMessage(content=user_input)]}, 
+                    config=config
+                ):
+                    if "generate" in event:
+                        ai_reply = event['generate']['messages'][-1].content
+                        print(f"AI: {ai_reply}")
+            except Exception as e:
+                print(f"❌ Error: {e}")
+                import traceback
+                traceback.print_exc()
+                break
