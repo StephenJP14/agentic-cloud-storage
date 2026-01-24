@@ -19,6 +19,8 @@ langgraph            # Agentic state machine logic
 pymupdf              # PDF parsing (used for file processing)
 langchain-text-splitters # Needed to chunk text before Qdrant storage
 langchain-community
+langchain-qdrant
+langgraph-checkpoint-redis
 
 # --- Utilities ---
 httpx                # Required for async API calls within FastAPI
