@@ -1,4 +1,4 @@
 .env
-/minio_data
-/qdrant_data
+/minio_data/*
+/qdrant_data/*
 .DS_Store
