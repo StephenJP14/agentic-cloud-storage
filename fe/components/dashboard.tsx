@@ -115,10 +115,10 @@ export default function Dashboard() {
             {/* Modal for FileUploader */}
             {isUploaderOpen && (
                 <div className="fixed w-full inset-0 z-60 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                    <div className="relative">
+                    <div className="relative w-full" onClick={() => setIsUploaderOpen(false)}>
                         <button
                             onClick={() => setIsUploaderOpen(false)}
-                            className="absolute -top-12 right-0 text-white hover:text-gray-300 font-bold"
+                            className="absolute -top-12 right-0 text-black hover:text-gray-300 font-bold"
                         >
                             Close ✕
                         </button>
