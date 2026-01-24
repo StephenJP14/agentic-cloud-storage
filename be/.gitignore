@@ -7,3 +7,4 @@ ENV/
 env/
 .env
 *.log
+temp_uploads/
