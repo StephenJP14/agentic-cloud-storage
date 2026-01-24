@@ -1,13 +1,41 @@
 'use client'
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { mockFiles, DriveFile } from './data';
 import FileUploader from './file-uploader';
 
 export default function Dashboard() {
-    const [files] = useState<DriveFile[]>(mockFiles);
+    const [files, setFiles] = useState<DriveFile[]>(mockFiles);
     const [isUploaderOpen, setIsUploaderOpen] = useState(false);
     const [dragActive, setDragActive] = useState(false);
     const [droppedFile, setDroppedFile] = useState<File | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const fetchFiles = async () => {
+        try {
+            const response = await fetch('http://localhost:8000/files/');
+            const data = await response.json();
+
+            // Map MinIO data to your DriveFile interface
+            const formattedFiles = data.files.map((f: any) => ({
+                id: f.name, // Using name as ID for now
+                name: f.name,
+                type: f.name.split('.').pop() === 'pdf' ? 'pdf' : 'doc', // Simple logic
+                owner: 'me',
+                updatedAt: new Date(f.last_modified).toLocaleDateString(),
+                size: `${(f.size / 1024).toFixed(1)} KB`
+            }));
+
+            setFiles(formattedFiles);
+        } catch (error) {
+            console.error("Failed to fetch files:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchFiles();
+    }, []);
 
     const handleDrag = (e: React.DragEvent) => {
         e.preventDefault();

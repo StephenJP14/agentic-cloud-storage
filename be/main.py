@@ -1,6 +1,6 @@
 import time
 from db.postgres import engine
-from fastapi import FastAPI, UploadFile, File, Depends, Response
+from fastapi import FastAPI, UploadFile, File, Depends, Response, APIRouter, HTTPException
 from sqlalchemy.orm import Session
 import io
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,11 +12,12 @@ from db.redis_client import redis_client
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, replace with your frontend URL
+    allow_origins=["*"],  # In production, replace with your frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 @app.post("/upload/")
 async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db)):
@@ -47,6 +48,48 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
         "cached": True,
         "db_verified": True
     }
+
+
+@app.get("/files/")
+async def list_files():
+    try:
+        # Check if bucket exists first
+        if not minio_client.bucket_exists(bucket_name):
+            return {"files": []}
+
+        # List objects in the bucket
+        objects = minio_client.list_objects(bucket_name, recursive=True)
+
+        file_list = []
+        for obj in objects:
+            file_list.append({
+                "name": obj.object_name,
+                "size": obj.size,
+                "last_modified": obj.last_modified.isoformat(),
+                "is_dir": obj.is_dir,
+                "content_type": obj.content_type
+            })
+
+        return {"files": file_list}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/files/download/{file_name}")
+async def get_file_url(file_name: str):
+    """Generates a temporary URL to view/download the file"""
+    try:
+        # URL expires in 1 hour (3600 seconds)
+        url = minio_client.get_presigned_url(
+            "GET",
+            bucket_name,
+            file_name,
+            expires=timedelta(seconds=3600),
+        )
+        return {"url": url}
+    except Exception as e:
+        raise HTTPException(status_code=404, detail="File not found")
 
 
 @app.get("/stats")
