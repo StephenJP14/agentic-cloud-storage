@@ -110,6 +110,7 @@ export default function Dashboard() {
                 </div>
             </main>
 
+            {/* Modal for FileUploader */}
             {isUploaderOpen && (
                 <div
                     className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40"
