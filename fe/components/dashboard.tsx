@@ -110,17 +110,19 @@ export default function Dashboard() {
                 </div>
             </main>
 
-            {/* Modal for FileUploader */}
             {isUploaderOpen && (
-                <div className="fixed w-full inset-0 z-60 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                    <div className="relative w-full" onClick={() => setIsUploaderOpen(false)}>
-                        <button
-                            onClick={() => setIsUploaderOpen(false)}
-                            className="absolute -top-12 right-0 text-black hover:text-gray-300 font-bold"
-                        >
-                            Close ✕
-                        </button>
-                        <FileUploader initialFile={droppedFile} onComplete={() => setIsUploaderOpen(false)} />
+                <div
+                    className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40"
+                    onClick={() => setIsUploaderOpen(false)} // Close when clicking background
+                >
+                    <div onClick={(e) => e.stopPropagation()}> {/* Prevents closing when clicking uploader */}
+                        <FileUploader
+                            initialFile={droppedFile}
+                            onComplete={() => {
+                                setIsUploaderOpen(false);
+                                setDroppedFile(null);
+                            }}
+                        />
                     </div>
                 </div>
             )}

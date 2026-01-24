@@ -25,7 +25,13 @@ export default function FileUploader({ initialFile, onComplete }: Props) {
         }
     };
 
-    // Handle drop event
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        e.stopPropagation(); // Add this
+        if (e.target.files && e.target.files[0]) {
+            setFile(e.target.files[0]);
+        }
+    };
+
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
@@ -36,21 +42,45 @@ export default function FileUploader({ initialFile, onComplete }: Props) {
         }
     };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            setFile(e.target.files[0]);
-        }
-    };
+    const [isUploading, setIsUploading] = useState(false);
 
     const uploadFile = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!file) return;
 
-        console.log("Uploading:", file.name);
-        setTimeout(() => {
-            alert(`Uploaded ${file.name}`);
+        setIsUploading(true);
+
+        // 1. Create FormData to match FastAPI's expectations
+        const formData = new FormData();
+        formData.append('file', file); // The key 'file' must match the backend parameter name
+
+        try {
+            console.log("Starting upload to FastAPI...");
+
+            // 2. Make the API call
+            const response = await fetch('http://localhost:8000/upload/', {
+                method: 'POST',
+                body: formData,
+                // Note: Don't set 'Content-Type' header manually; 
+                // the browser sets it to 'multipart/form-data' automatically with the boundary
+            });
+
+            if (!response.ok) {
+                throw new Error(`Upload failed with status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log("Success:", data);
+
+            alert(`Successfully uploaded ${data.filename} to MinIO!`);
+
             if (onComplete) onComplete();
-        }, 1000);
+        } catch (error) {
+            console.error("Upload error:", error);
+            alert("Failed to upload file. Check if the backend is running.");
+        } finally {
+            setIsUploading(false);
+        }
     };
 
     const removeFile = () => {
@@ -111,16 +141,15 @@ export default function FileUploader({ initialFile, onComplete }: Props) {
                             </button>
                         </div>
                     )}
-
                     <button
                         type="submit"
-                        disabled={!file}
-                        className={`w-full py-2.5 rounded-md font-semibold transition-all ${file
+                        disabled={!file || isUploading}
+                        className={`w-full py-2.5 rounded-md font-semibold transition-all ${file && !isUploading
                             ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md active:scale-95'
                             : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                             }`}
                     >
-                        Upload to Server
+                        {isUploading ? "Uploading..." : "Upload to Server"}
                     </button>
                 </form>
             </div>

@@ -3,14 +3,20 @@ from db.postgres import engine
 from fastapi import FastAPI, UploadFile, File, Depends, Response
 from sqlalchemy.orm import Session
 import io
-
+from fastapi.middleware.cors import CORSMiddleware
 from db.postgres import get_db
 from db.minio_client import minio_client, bucket_name
 from db.qdrant_client import qdrant_client
 from db.redis_client import redis_client
 
 app = FastAPI()
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # In production, replace with your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.post("/upload/")
 async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db)):
