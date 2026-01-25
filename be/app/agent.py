@@ -223,7 +223,7 @@ def email_node(state: AgentState):
 def answer_node(state: AgentState):
     messages = state["messages"]
     last_message = messages[-1]
-    file_url = state.get("file_url", "")
+    file_url = state.get("file_url", "No Link Available")
 
     # CHECK: Is this a RAG response?
     if isinstance(last_message, SystemMessage) and "DOCUMENT CONTEXT" in last_message.content:

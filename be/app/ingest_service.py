@@ -9,6 +9,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 from langchain_core.messages import HumanMessage
 from urllib.parse import quote
+from langchain_qdrant import QdrantVectorStore
 
 # 1. Load Config (Points to your Windows PC)
 load_dotenv()
@@ -98,6 +99,7 @@ def extract_content_from_pdf(pdf_path):
 # ---------------------------------------------------------
 def ingest_file(file_path, user_id="u_default"):
     filename = os.path.basename(file_path)
+    collection_name = "user_docs"
     
     # 1. Extract (Text + Vision)
     raw_text = extract_content_from_pdf(file_path)
@@ -110,47 +112,34 @@ def ingest_file(file_path, user_id="u_default"):
     chunks = splitter.split_text(raw_text)
     print(f"✂️ Split into {len(chunks)} chunks.")
 
-    # 3. Create Collection (if not exists)
-    collection_name = "user_docs"
-    if not qdrant.collection_exists(collection_name):
-        qdrant.create_collection(
-            collection_name=collection_name,
-            vectors_config=models.VectorParams(
-                size=1024, # BGE-M3 standard size
-                distance=models.Distance.COSINE
-            )
-        )
-
-    # 4. Embed & Upload to Qdrant
-    print("🧠 Embedding and Indexing...")
-    points = []
-    
-    # Batch embedding (More efficient)
-    vectors = embed_model.embed_documents(chunks)
-    safe_filename = quote(filename, safe="")
-
-    for i, (chunk, vector) in enumerate(zip(chunks, vectors)):
-        payload = {
+    # 3. Create metadata for each chunk
+    # This ensures every chunk knows which file it belongs to
+    metadatas = [
+        {
             "filename": filename,
             "user_id": user_id,
-            "file_url": f'{QDRANT_URL}/{collection_name}/{filename}',
-            "text": chunk, # We store the text so we can retrieve it later!
+            "file_url": f'http://{WINDOWS_IP}:6333/dashboard#/collections/{collection_name}', # Or your custom storage URL
             "chunk_id": i
-        }
+        } 
+        for i in range(len(chunks))
+    ]
 
-        point_id = str(uuid.uuid4())
-        points.append(models.PointStruct(
-            id=point_id,  # Ideally use UUID here
-            vector=vector,
-            payload=payload
-        ))
-
-    # Push to Windows Qdrant
-    qdrant.upsert(
-        collection_name=collection_name,
-        points=points
-    )
-    print(f"✅ Success! {filename} is now searchable.")
+    # 4. Embed & Upload using LangChain's VectorStore
+    # This handles collection creation, embedding, and payload mapping automatically
+    print(f"🧠 Embedding and Indexing {filename}...")
+    
+    try:
+        vector_store = QdrantVectorStore.from_texts(
+            texts=chunks,
+            embedding=embed_model,
+            url=QDRANT_URL,
+            collection_name=collection_name,
+            metadatas=metadatas,
+            content_payload_key="text", # Important: matches your Agent config
+        )
+        print(f"✅ Success! {filename} is now searchable with file_url.")
+    except Exception as e:
+        print(f"❌ Ingestion Error: {e}")
 
 # # ---------------------------------------------------------
 # # TEST RUN (Run this file directly)
