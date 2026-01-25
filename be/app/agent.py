@@ -36,8 +36,8 @@ print(f"🔌 Connecting to Backend at {WINDOWS_IP}...")
 client = QdrantClient(url=QDRANT_URL)
 embeddings = OllamaEmbeddings(base_url=OLLAMA_URL, model="bge-m3")
 vector_store = QdrantVectorStore(
-    client=client, 
-    collection_name="user_docs", 
+    client=client,
+    collection_name="user_docs",
     embedding=embeddings,
     content_payload_key="text"  # <--- CRITICAL FIX: Match your ingestion key!
 )
@@ -45,6 +45,8 @@ vector_store = QdrantVectorStore(
 # ---------------------------------------------------------
 # TOOLS
 # ---------------------------------------------------------
+
+
 @tool
 def search_documents(query: str):
     """Search documents."""
@@ -54,11 +56,13 @@ def search_documents(query: str):
         return "No documents found."
     return "\n".join([doc.page_content for doc in results])
 
+
 @tool
 def send_email(recipient: str, subject: str, body: str):
     """Send email."""
     print(f"   [TOOL] 📧 Sending email to {recipient}...")
     return f"Email sent to {recipient}."
+
 
 # ---------------------------------------------------------
 # MODELS
@@ -68,11 +72,14 @@ llm = ChatOllama(base_url=OLLAMA_URL, model="llama3.1:8b", temperature=0)
 # ---------------------------------------------------------
 # ROUTER
 # ---------------------------------------------------------
+
+
 class RouteQuery(BaseModel):
     datasource: Literal["vectorstore", "email_tool", "chitchat"] = Field(
         ...,
         description="Route user input based on conversation context."
     )
+
 
 router_system = """You are an intent classifier.
 Analyze the user's latest message AND the chat history.
@@ -93,12 +100,16 @@ router_chain = router_prompt | llm.with_structured_output(RouteQuery)
 # ---------------------------------------------------------
 # STATE
 # ---------------------------------------------------------
+
+
 class AgentState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     context: str
+    file_url: str  # <--- New field to track the source
+
 
 def get_history_text(messages):
-    recent = messages[-5:] 
+    recent = messages[-5:]
     text = ""
     for msg in recent:
         role = "User" if isinstance(msg, HumanMessage) else "AI"
@@ -109,13 +120,14 @@ def get_history_text(messages):
 # NODES
 # ---------------------------------------------------------
 
+
 def router_node(state: AgentState):
     messages = state["messages"]
     last_message = messages[-1].content
-    history_text = get_history_text(messages[:-1]) 
-    
+    history_text = get_history_text(messages[:-1])
+
     print(f"\n🧠 Router seeing: '{last_message}'")
-    
+
     try:
         decision = router_chain.invoke({
             "history": history_text,
@@ -124,48 +136,63 @@ def router_node(state: AgentState):
         step = decision.datasource
     except:
         step = "chitchat"
-        
+
     print(f"   👉 Decision: {step}")
     return {"context": step}
 
+
 def search_node(state: AgentState):
     last_message = state["messages"][-1].content
-    result = search_documents.invoke(last_message)
-    print("Search Results:", result)
+
+    # Perform search but get the full Document objects
+    results = vector_store.similarity_search(last_message, k=1)
+
+    if not results:
+        return {"messages": [SystemMessage(content="No docs found.")], "file_url": ""}
+
+    # Extract content and the URL/Path from metadata
+    content = results[0].page_content
+    # Assuming your ingestion script stored the path in 'metadata'
+    source_url = results[0].metadata.get("file_path", "Unknown Link")
+
     return {
-        "messages": [
-            SystemMessage(content=f"DOCUMENT CONTEXT FROM DATABASE:\n{result}")
-        ]
+        "messages": [SystemMessage(content=f"DOCUMENT CONTEXT:\n{content}")],
+        "file_url": source_url  # Store the URL in the state
     }
+
 
 def email_node(state: AgentState):
     last_message = state["messages"][-1].content
-    res = send_email.invoke({"recipient": "admin@test.com", "subject": "Action", "body": last_message})
+    res = send_email.invoke(
+        {"recipient": "admin@test.com", "subject": "Action", "body": last_message})
     return {
         "messages": [
             SystemMessage(content=f"TOOL OUTPUT: {res}")
         ]
     }
 
+
 def answer_node(state: AgentState):
     messages = state["messages"]
     last_message = messages[-1]
+    file_url = state.get("file_url", "")  # Retrieve from state
 
     # CHECK: Is this a RAG response (Document Context)?
     if isinstance(last_message, SystemMessage) and "DOCUMENT CONTEXT" in last_message.content:
-        
+
         # 1. SAFELY Find the last User Question
         # Iterate backwards to find the first HumanMessage
-        user_question = "Summary" # Default
+        user_question = "Summary"  # Default
         for msg in reversed(messages):
             if isinstance(msg, HumanMessage):
                 user_question = msg.content
                 break
-        
+
         context_data = last_message.content
-        
-        print(f"   [GENERATE] 📝 Analyzing Context for question: '{user_question}'")
-        
+
+        print(
+            f"   [GENERATE] 📝 Analyzing Context for question: '{user_question}'")
+
         # 2. BETTER PROMPT for Llama 3
         # We explicitly tell it how to read a document (CVs usually have names at the top).
         rag_prompt = f"""You are an intelligent document analyst.
@@ -184,10 +211,18 @@ def answer_node(state: AgentState):
         3. NOTE: If the document looks like a CV or Resume, the Name is usually at the very top, and Contact Info is near it.
         4. If the answer is truly missing, say "I couldn't find that information in the document."
         """
-        
+
         # 3. Invoke LLM with this focused prompt
         response = llm.invoke([HumanMessage(content=rag_prompt)])
-        return {"messages": [response]}
+        response = llm.invoke([HumanMessage(content=rag_prompt)])
+        ai_text = response.content
+
+        final_json = {
+            "answer": ai_text,
+            "file_url": file_url
+        }
+
+        return {"messages": [AIMessage(content=json.dumps(final_json))]}
 
     # FALLBACK: Normal Chitchat
     response = llm.invoke(messages)
@@ -206,14 +241,19 @@ workflow.add_node("generate", answer_node)
 
 workflow.set_entry_point("router")
 
+
 def route_logic(state):
     decision = state["context"]
-    if decision == "vectorstore": return "search"
-    elif decision == "email_tool": return "email"
-    else: return "generate"
+    if decision == "vectorstore":
+        return "search"
+    elif decision == "email_tool":
+        return "email"
+    else:
+        return "generate"
 
-workflow.add_conditional_edges("router", route_logic, 
-    {"search": "search", "email": "email", "generate": "generate"})
+
+workflow.add_conditional_edges("router", route_logic,
+                               {"search": "search", "email": "email", "generate": "generate"})
 
 workflow.add_edge("search", "generate")
 workflow.add_edge("email", "generate")
@@ -236,27 +276,27 @@ if __name__ == "__main__":
 
     # Open connection
     with RedisSaver.from_conn_string(REDIS_URL) as checkpointer:
-        
+
         # 1. INITIALIZE INDICES (Crucial Step!)
         # This creates the 'checkpoint_write' and 'checkpoint_migrations' indices in Redis
         print("🔧 Setting up Redis Indices...")
-        checkpointer.setup() 
+        checkpointer.setup()
 
         # 2. Compile graph with the ready checkpointer
         app = workflow.compile(checkpointer=checkpointer)
-        
+
         print("🤖 Agent V5 (With Redis Memory) Online.")
-        
+
         config = {"configurable": {"thread_id": "stephen_session_1"}}
-        
+
         while True:
             try:
                 user_input = input("\nYou: ")
                 if user_input.lower() in ["quit", "exit"]:
                     break
-                    
+
                 for event in app.stream(
-                    {"messages": [HumanMessage(content=user_input)]}, 
+                    {"messages": [HumanMessage(content=user_input)]},
                     config=config
                 ):
                     if "generate" in event:
