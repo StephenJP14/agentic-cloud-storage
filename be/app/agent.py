@@ -154,7 +154,7 @@ def search_node(state: AgentState):
     # Extract content and the URL/Path from metadata
     content = results[0].page_content
     # Assuming your ingestion script stored the path in 'metadata'
-    source_url = results[0].metadata.get("file_path", "Unknown Link") 
+    source_url = results[0].metadata.get("file_url", "Unknown Link") 
 
     return {
         "messages": [SystemMessage(content=f"DOCUMENT CONTEXT:\n{content}")],
