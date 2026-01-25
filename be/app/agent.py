@@ -144,7 +144,6 @@ def router_node(state: AgentState):
 
 def search_node(state: AgentState):
     last_message = state["messages"][-1].content
-<<<<<<< HEAD
 
     # Perform search but get the full Document objects
     results = vector_store.similarity_search(last_message, k=1)
@@ -155,10 +154,8 @@ def search_node(state: AgentState):
     # Extract content and the URL/Path from metadata
     content = results[0].page_content
     # Assuming your ingestion script stored the path in 'metadata'
-    source_url = results[0].metadata.get("file_path", "Unknown Link")
+    source_url = results[0].metadata.get("file_url", "Unknown Link")
 
-=======
-    
     # --- STEP 1: QUERY REWRITING (The Fix) ---
     # We ask the LLM to strip away "Can you find..." and just give keywords.
     refine_prompt = f"""You are a search optimizer. 
@@ -180,7 +177,6 @@ def search_node(state: AgentState):
     # --- STEP 2: SEARCH WITH OPTIMIZED QUERY ---
     result = search_documents.invoke(optimized_query)
     
->>>>>>> 2ac69176b4d1eb9249155fe4a0e59e58ff6858d7
     return {
         "messages": [SystemMessage(content=f"DOCUMENT CONTEXT:\n{content}")],
         "file_url": source_url  # Store the URL in the state
