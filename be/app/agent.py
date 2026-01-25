@@ -52,6 +52,7 @@ def search_documents(query: str):
     results = vector_store.similarity_search(query, k=3)
     if not results:
         return "No documents found."
+    print("[RESULTS]    ", results)
     return "\n".join([doc.page_content for doc in results])
 
 @tool
@@ -130,8 +131,28 @@ def router_node(state: AgentState):
 
 def search_node(state: AgentState):
     last_message = state["messages"][-1].content
-    result = search_documents.invoke(last_message)
-    print("Search Results:", result)
+    
+    # --- STEP 1: QUERY REWRITING (The Fix) ---
+    # We ask the LLM to strip away "Can you find..." and just give keywords.
+    refine_prompt = f"""You are a search optimizer. 
+    Convert the user's question into a clean keyword search query for a vector database.
+    Remove conversational fillers (e.g., "please", "can you", "find", "search for").
+    Focus on proper nouns and key topics.
+    
+    User Question: "{last_message}"
+    
+    Output ONLY the keywords.
+    """
+    
+    # Invoke LLM to get cleaner keywords
+    # We use the same 'llm' instance defined earlier
+    optimized_query = llm.invoke(refine_prompt).content
+    
+    print(f"   [OPTIMIZER] 🔄 Original: '{last_message}' -> Keywords: '{optimized_query}'")
+    
+    # --- STEP 2: SEARCH WITH OPTIMIZED QUERY ---
+    result = search_documents.invoke(optimized_query)
+    
     return {
         "messages": [
             SystemMessage(content=f"DOCUMENT CONTEXT FROM DATABASE:\n{result}")

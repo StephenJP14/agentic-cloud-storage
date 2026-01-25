@@ -1,22 +1,21 @@
 import os
 import shutil
 import time
-from datetime import timedelta
 from typing import Optional
 
 # FastAPI Imports
-from fastapi import FastAPI, UploadFile, File, Depends, Response, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 # DB Imports
-from db.postgres import engine, get_db
+from db.postgres import get_db
 from db.minio_client import minio_client, bucket_name
-from db.qdrant_client import qdrant_client
 from db.redis_client import redis_client
 
 # AI Imports (From your app folder)
+# Ensure ingest_service and agent are correctly imported
 from app.ingest_service import ingest_file
 from app.agent import workflow, REDIS_URL
 from langgraph.checkpoint.redis import RedisSaver
@@ -24,7 +23,7 @@ from langchain_core.messages import HumanMessage
 
 app = FastAPI()
 
-# Enable CORS
+# Enable CORS (Allow frontend access)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -51,11 +50,13 @@ def startup_event():
     """Ensures Redis Search Indices are created when API starts."""
     try:
         print("⚙️ Startup: Verifying Redis Indices...")
+        # We use a context manager to safely open/close the connection
         with RedisSaver.from_conn_string(REDIS_URL) as checkpointer:
             checkpointer.setup()
         print("✅ Redis Indices Ready.")
     except Exception as e:
-        print(f"⚠️ Warning: Redis setup failed (might already exist): {e}")
+        # It's okay if they already exist, just log a warning
+        print(f"⚠️ Redis Setup Note: {e}")
 
 # ---------------------------------------------------------
 # ENDPOINTS
@@ -72,14 +73,14 @@ async def chat_endpoint(request: ChatRequest):
         # 1. Initialize Redis Checkpointer per request
         with RedisSaver.from_conn_string(REDIS_URL) as checkpointer:
             
-            # 2. Compile the Graph
+            # 2. Compile the Graph with Persistence
             agent_app = workflow.compile(checkpointer=checkpointer)
             
             # 3. Prepare Config (Memory Key)
             config = {"configurable": {"thread_id": request.thread_id}}
             
             # 4. Invoke the Agent
-            # We use .invoke() instead of .stream() for HTTP Request/Response
+            # Use .invoke() for a single Request/Response cycle
             result = agent_app.invoke(
                 {"messages": [HumanMessage(content=request.message)]},
                 config=config
@@ -97,7 +98,7 @@ async def chat_endpoint(request: ChatRequest):
 
 @app.post("/upload/")
 async def upload_file(
-    background_tasks: BackgroundTasks, # <--- Added for async processing
+    background_tasks: BackgroundTasks, 
     file: UploadFile = File(...), 
     db: Session = Depends(get_db)
 ):
@@ -115,13 +116,12 @@ async def upload_file(
         minio_client.put_object(
             bucket_name,
             file.filename,
-            file.file, # Using file object directly
+            file.file, 
             length=file_size,
             content_type=file.content_type
         )
         
-        # 2. Save to Temp File for Ingestion
-        # (ingest_service needs a file path, not bytes)
+        # 2. Save to Temp File for Ingestion Service
         temp_dir = "temp_uploads"
         os.makedirs(temp_dir, exist_ok=True)
         temp_path = os.path.join(temp_dir, file.filename)
@@ -129,8 +129,8 @@ async def upload_file(
         with open(temp_path, "wb") as f:
             f.write(file_content)
 
-        # 3. Trigger Background Task (Ingest Pipeline)
-        # This runs AFTER the response is sent to the user
+        # 3. Trigger Background Task
+        # The API responds immediately, Python works in background
         background_tasks.add_task(process_ingestion, temp_path, file.filename)
 
         return {
@@ -172,5 +172,5 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    # Allow access from all IPs so Mac can connect
+    # 0.0.0.0 allows external access (required for connecting from other machines)
     uvicorn.run(app, host="0.0.0.0", port=8000)

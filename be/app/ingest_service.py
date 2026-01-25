@@ -132,7 +132,7 @@ def ingest_file(file_path, user_id="u_default"):
         payload = {
             "filename": filename,
             "user_id": user_id,
-            "file_url": f'{QDRANT_URL}/{collection_name}/{filename}'
+            "file_url": f'{QDRANT_URL}/{collection_name}/{filename}',
             "text": chunk, # We store the text so we can retrieve it later!
             "chunk_id": i
         }
