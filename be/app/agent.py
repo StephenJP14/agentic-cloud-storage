@@ -58,11 +58,11 @@ vector_store = QdrantVectorStore(
 # ---------------------------------------------------------
 # TOOLS
 # ---------------------------------------------------------
-@tool
-def search_documents(query: str):
-    """Search documents."""
-    # This dummy function is required for the graph, but we call vector_store manually in the node
-    pass
+# @tool
+# def search_documents(query: str):
+#     """Search documents."""
+#     # This dummy function is required for the graph, but we call vector_store manually in the node
+#     pass
 
 @tool
 def send_email(recipient: str, subject: str, body: str):
@@ -90,15 +90,15 @@ Analyze the user's latest message AND the chat history.
 
 ROUTING RULES:
 1. 'vectorstore': 
-   - ANY mentions of "CV", "File", "Resume", "Book", "Document", "PDF".
-   - Requests to "analyze" (analisa), "summarize" (rangkum), or "find" (cari) information in files.
-   - INDONESIAN KEYWORDS: "unggah", "file", "cv", "lamaran", "analisa", "baca", "rangkum", "cari", "panggil tool", "ambil data".
-   
+   - Questions about files, PDFs, documents, CVs, Reports.
+   - Keywords: "summarize", "analisa", "rangkum", "baca", "cari", "lihat", "file", "upload".
+   - IF the user asks to "summarize" or "analyze" something, ALWAYS choose 'vectorstore'.
+
 2. 'email_tool': Explicit commands to send email.
 
-3. 'chitchat': Greetings ("halo", "hi"), or general questions NOT about files.
+3. 'chitchat': Greetings only.
 
-CRITICAL: If the user mentions "CV" or "File" in ANY language, you MUST pick 'vectorstore'.
+CRITICAL: If ambiguous, lean towards 'vectorstore'.
 """
 
 router_prompt = ChatPromptTemplate.from_messages([
@@ -146,33 +146,64 @@ def router_node(state: AgentState):
     print(f"   👉 Decision: {step}")
     return {"context": step}
 
+# Add this to your Pydantic models (Near RouteQuery)
+class SearchQuery(BaseModel):
+    search_keywords: str = Field(
+        ...,
+        description="The final search keywords in the target document's language. NO explanations."
+    )
+    explanation: str = Field(
+        description="Your internal reasoning (this will be discarded)."
+    )
+
+# ---------------------------------------------------------
+# FIXED SEARCH NODE
+# ---------------------------------------------------------
 def search_node(state: AgentState):
-    last_message = state["messages"][-1].content
+    messages = state["messages"]
+    last_message = messages[-1].content
     
-    # 🚀 FIX 2: Optimizer removes "panggil tools" and focuses on "CV"
-    analyze_prompt = f"""You are a search query optimizer.
-    The user is asking to search for documents but might use "meta-instructions".
+    # 1. Get History
+    history_text = get_history_text(messages[:-1]) 
+    
+    # 2. Strict Prompt
+    analyze_prompt = f"""You are a Search Optimizer.
+    
+    CONTEXT HISTORY:
+    {history_text}
+    
+    CURRENT INPUT: 
+    "{last_message}"
     
     TASK:
-    1. Remove phrases like: "call tools", "use search", "panggil", "tolong", "buka", "ambil".
-    2. Extract ONLY the *topic* (e.g., "CV", "Resume", "Skills", "Experience").
-    3. If they say "tolong panggil tools untuk ambil cv saya", the keyword is just "CV".
-    
-    User Request: "{last_message}"
-    
-    Output ONLY the clean keyword.
+    1. Determine what document the user is looking for (e.g., "CV", "Laporan Kerja Sosial").
+    2. If the user refers to a previous topic (like "Analyze it"), use the History to find the noun.
+    3. Output ONLY the keywords.
     """
     
-    optimized_query = llm.invoke(analyze_prompt).content.strip()
-    print(f"   [OPTIMIZER] 🔄 Original: '{last_message}' -> Clean: '{optimized_query}'")
+    # 3. 🚀 FORCE STRUCTURED OUTPUT (This stops the yapping)
+    # We ask for a JSON object. We will only use 'search_keywords'.
+    structured_llm = llm.with_structured_output(SearchQuery)
     
-    # Search with the CLEAN keywords (k=5 for more context)
-    results = vector_store.similarity_search(optimized_query, k=5) 
+    try:
+        result = structured_llm.invoke(analyze_prompt)
+        # Extract ONLY the keywords, ignore the reasoning
+        optimized_query = result.search_keywords
+    except Exception as e:
+        # Fallback if JSON fails
+        print(f"⚠️ JSON Parse failed: {e}")
+        optimized_query = last_message
+
+    print(f"   [OPTIMIZER] 🔄 Original: '{last_message}'")
+    print(f"   [OPTIMIZER] ✅ Cleaned: '{optimized_query}'") # <--- This will now be short!
+    
+    # 4. Search
+    print(f"   [SEARCH] 🔍 Searching Vector Store with: '{optimized_query}'")
+    results = vector_store.similarity_search(optimized_query, k=5)
     
     if not results:
         return {"messages": [SystemMessage(content="No docs found.")], "file_url": ""}
 
-    # Combine ALL chunks found
     content = "\n\n---\n\n".join([doc.page_content for doc in results])
     source_url = results[0].metadata.get("file_url", "Unknown Link") 
 
