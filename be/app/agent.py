@@ -54,6 +54,7 @@ def search_documents(query: str):
     results = vector_store.similarity_search(query, k=3)
     if not results:
         return "No documents found."
+    print("[RESULTS]    ", results)
     return "\n".join([doc.page_content for doc in results])
 
 
@@ -143,6 +144,7 @@ def router_node(state: AgentState):
 
 def search_node(state: AgentState):
     last_message = state["messages"][-1].content
+<<<<<<< HEAD
 
     # Perform search but get the full Document objects
     results = vector_store.similarity_search(last_message, k=1)
@@ -155,6 +157,30 @@ def search_node(state: AgentState):
     # Assuming your ingestion script stored the path in 'metadata'
     source_url = results[0].metadata.get("file_path", "Unknown Link")
 
+=======
+    
+    # --- STEP 1: QUERY REWRITING (The Fix) ---
+    # We ask the LLM to strip away "Can you find..." and just give keywords.
+    refine_prompt = f"""You are a search optimizer. 
+    Convert the user's question into a clean keyword search query for a vector database.
+    Remove conversational fillers (e.g., "please", "can you", "find", "search for").
+    Focus on proper nouns and key topics.
+    
+    User Question: "{last_message}"
+    
+    Output ONLY the keywords.
+    """
+    
+    # Invoke LLM to get cleaner keywords
+    # We use the same 'llm' instance defined earlier
+    optimized_query = llm.invoke(refine_prompt).content
+    
+    print(f"   [OPTIMIZER] 🔄 Original: '{last_message}' -> Keywords: '{optimized_query}'")
+    
+    # --- STEP 2: SEARCH WITH OPTIMIZED QUERY ---
+    result = search_documents.invoke(optimized_query)
+    
+>>>>>>> 2ac69176b4d1eb9249155fe4a0e59e58ff6858d7
     return {
         "messages": [SystemMessage(content=f"DOCUMENT CONTEXT:\n{content}")],
         "file_url": source_url  # Store the URL in the state
