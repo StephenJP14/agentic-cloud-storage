@@ -1,16 +1,19 @@
 import os
+import json
 from typing import TypedDict, Literal, Annotated
 from dotenv import load_dotenv
 
 # ---------------------------------------------------------
-# NEW IMPORTS FOR REDIS PERSISTENCE
+# IMPORTS
 # ---------------------------------------------------------
 from langgraph.checkpoint.redis import RedisSaver
 from redis import Redis
-import json
+
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
+from qdrant_client.http import models # Import for check
+
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, BaseMessage
@@ -25,38 +28,41 @@ OLLAMA_PORT = os.getenv("OLLAMA_PORT", "11434")
 QDRANT_PORT = os.getenv("QDRANT_PORT", "6333")
 REDIS_PORT = os.getenv("REDIS_PORT", "6379")
 
-# Construct URLs dynamically so we don't depend on .env substitution
 OLLAMA_URL = f"http://{WINDOWS_IP}:{OLLAMA_PORT}"
 QDRANT_URL = f"http://{WINDOWS_IP}:{QDRANT_PORT}"
 REDIS_URL = f"redis://{WINDOWS_IP}:{REDIS_PORT}"
 
 print(f"🔌 Connecting to Backend at {WINDOWS_IP}...")
 
-# 2. Setup Vector DB
+# 2. Setup Vector DB (Auto-Create Collection if missing)
 client = QdrantClient(url=QDRANT_URL)
 embeddings = OllamaEmbeddings(base_url=OLLAMA_URL, model="bge-m3")
+
+collection_name = "user_docs"
+try:
+    client.get_collection(collection_name=collection_name)
+except Exception:
+    print(f"⚠️ Collection '{collection_name}' missing! Creating it now...")
+    client.create_collection(
+        collection_name=collection_name,
+        vectors_config=models.VectorParams(size=1024, distance=models.Distance.COSINE)
+    )
+
 vector_store = QdrantVectorStore(
     client=client,
-    collection_name="user_docs",
+    collection_name=collection_name,
     embedding=embeddings,
-    content_payload_key="text"  # <--- CRITICAL FIX: Match your ingestion key!
+    content_payload_key="text"
 )
 
 # ---------------------------------------------------------
 # TOOLS
 # ---------------------------------------------------------
-
-
 @tool
 def search_documents(query: str):
     """Search documents."""
-    print(f"   [TOOL] 🕵️‍♀️ Searching Qdrant for: '{query}'")
-    results = vector_store.similarity_search(query, k=3)
-    if not results:
-        return "No documents found."
-    print("[RESULTS]    ", results)
-    return "\n".join([doc.page_content for doc in results])
-
+    # This dummy function is required for the graph, but we call vector_store manually in the node
+    pass
 
 @tool
 def send_email(recipient: str, subject: str, body: str):
@@ -64,31 +70,35 @@ def send_email(recipient: str, subject: str, body: str):
     print(f"   [TOOL] 📧 Sending email to {recipient}...")
     return f"Email sent to {recipient}."
 
-
 # ---------------------------------------------------------
 # MODELS
 # ---------------------------------------------------------
 llm = ChatOllama(base_url=OLLAMA_URL, model="llama3.1:8b", temperature=0)
 
 # ---------------------------------------------------------
-# ROUTER
+# ROUTER (FIXED FOR INDONESIAN)
 # ---------------------------------------------------------
-
-
 class RouteQuery(BaseModel):
     datasource: Literal["vectorstore", "email_tool", "chitchat"] = Field(
         ...,
         description="Route user input based on conversation context."
     )
 
-
+# 🚀 MAJOR FIX: Explicit Indonesian keywords in the prompt
 router_system = """You are an intent classifier.
 Analyze the user's latest message AND the chat history.
 
 ROUTING RULES:
-1. 'vectorstore': Questions about uploaded files, CV, specific identity data, or summarizing documents.
+1. 'vectorstore': 
+   - ANY mentions of "CV", "File", "Resume", "Book", "Document", "PDF".
+   - Requests to "analyze" (analisa), "summarize" (rangkum), or "find" (cari) information in files.
+   - INDONESIAN KEYWORDS: "unggah", "file", "cv", "lamaran", "analisa", "baca", "rangkum", "cari", "panggil tool", "ambil data".
+   
 2. 'email_tool': Explicit commands to send email.
-3. 'chitchat': Everything else (Greetings, General Knowledge, Follow-up questions about previous chitchat).
+
+3. 'chitchat': Greetings ("halo", "hi"), or general questions NOT about files.
+
+CRITICAL: If the user mentions "CV" or "File" in ANY language, you MUST pick 'vectorstore'.
 """
 
 router_prompt = ChatPromptTemplate.from_messages([
@@ -101,13 +111,10 @@ router_chain = router_prompt | llm.with_structured_output(RouteQuery)
 # ---------------------------------------------------------
 # STATE
 # ---------------------------------------------------------
-
-
 class AgentState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     context: str
-    file_url: str  # <--- New field to track the source
-
+    file_url: str
 
 def get_history_text(messages):
     recent = messages[-5:]
@@ -120,8 +127,6 @@ def get_history_text(messages):
 # ---------------------------------------------------------
 # NODES
 # ---------------------------------------------------------
-
-
 def router_node(state: AgentState):
     messages = state["messages"]
     last_message = messages[-1].content
@@ -141,35 +146,33 @@ def router_node(state: AgentState):
     print(f"   👉 Decision: {step}")
     return {"context": step}
 
-
 def search_node(state: AgentState):
     last_message = state["messages"][-1].content
     
-    # --- INTELLIGENT QUERY CLEANING ---
+    # 🚀 FIX 2: Optimizer removes "panggil tools" and focuses on "CV"
     analyze_prompt = f"""You are a search query optimizer.
-    The user is asking to search for documents.
+    The user is asking to search for documents but might use "meta-instructions".
     
     TASK:
-    1. Remove "meta-instructions" like "call tools", "use search", "panggil", "tolong", "find".
-    2. Extract ONLY the *subject* they want (e.g., "CV", "Resume", "Skills", "Experience").
-    3. If they just say "my cv", the keyword is "CV".
+    1. Remove phrases like: "call tools", "use search", "panggil", "tolong", "buka", "ambil".
+    2. Extract ONLY the *topic* (e.g., "CV", "Resume", "Skills", "Experience").
+    3. If they say "tolong panggil tools untuk ambil cv saya", the keyword is just "CV".
     
     User Request: "{last_message}"
     
-    Output ONLY the clean keywords.
+    Output ONLY the clean keyword.
     """
     
-    # Run the cleaning
-    optimized_query = llm.invoke(analyze_prompt).content
+    optimized_query = llm.invoke(analyze_prompt).content.strip()
     print(f"   [OPTIMIZER] 🔄 Original: '{last_message}' -> Clean: '{optimized_query}'")
     
-    # Search with the CLEAN keywords (e.g., just "CV")
-    results = vector_store.similarity_search(optimized_query, k=5) # Increase k to 5 to get more context
+    # Search with the CLEAN keywords (k=5 for more context)
+    results = vector_store.similarity_search(optimized_query, k=5) 
     
     if not results:
         return {"messages": [SystemMessage(content="No docs found.")], "file_url": ""}
 
-    # Combine ALL chunks found (not just the first one)
+    # Combine ALL chunks found
     content = "\n\n---\n\n".join([doc.page_content for doc in results])
     source_url = results[0].metadata.get("file_url", "Unknown Link") 
 
@@ -178,46 +181,38 @@ def search_node(state: AgentState):
         "file_url": source_url 
     }
 
-
 def email_node(state: AgentState):
     last_message = state["messages"][-1].content
     res = send_email.invoke(
         {"recipient": "admin@test.com", "subject": "Action", "body": last_message})
     return {
-        "messages": [
-            SystemMessage(content=f"TOOL OUTPUT: {res}")
-        ]
+        "messages": [SystemMessage(content=f"TOOL OUTPUT: {res}")]
     }
-
 
 def answer_node(state: AgentState):
     messages = state["messages"]
     last_message = messages[-1]
-    file_url = state.get("file_url", "")  # Retrieve from state
+    file_url = state.get("file_url", "")
 
-    # CHECK: Is this a RAG response (Document Context)?
+    # CHECK: Is this a RAG response?
     if isinstance(last_message, SystemMessage) and "DOCUMENT CONTEXT" in last_message.content:
 
-        # 1. SAFELY Find the last User Question
-        # Iterate backwards to find the first HumanMessage
-        user_question = "Summary"  # Default
+        # Find User Question
+        user_question = "Summary"
         for msg in reversed(messages):
             if isinstance(msg, HumanMessage):
                 user_question = msg.content
                 break
 
         context_data = last_message.content
+        print(f"   [GENERATE] 📝 Analyzing Context for question: '{user_question}'")
 
-        print(
-            f"   [GENERATE] 📝 Analyzing Context for question: '{user_question}'")
-
-        # 2. BETTER PROMPT for Llama 3
-        # We explicitly tell it how to read a document (CVs usually have names at the top).
+        # 🚀 FIX 3: Prompt ignores "how to call tools"
         rag_prompt = f"""You are an intelligent document analyst.
         
-        USER'S ORIGINAL REQUEST: "{user_question}"
+        USER REQUEST: "{user_question}"
         
-        RETRIEVED DOCUMENT CONTENT:
+        DOCUMENT CONTENT:
         --------------------------------------------------
         {context_data}
         --------------------------------------------------
@@ -225,16 +220,13 @@ def answer_node(state: AgentState):
         INSTRUCTIONS:
         1. The user might be asking you to "find", "read", or "analyze" this file.
         2. DO NOT interpret their request as a question about "how to use tools".
-        3. Instead, fulfill the INTENT:
-           - If they ask for "CV", summarize the skills and experience found in the text.
-           - If they ask "What are my skills?", list them from the text.
-        4. IGNORE phrases like "call tools" or "use vectorstore". Focus on the DOCUMENT CONTENT.
+        3. Ignore phrases like "call tools" or "use vectorstore". 
+        4. Fulfill the INTENT (e.g., if they ask for CV, summarize the skills in the text).
         
         Output the analysis now:
         """
 
-        # 3. Invoke LLM with this focused prompt
-        response = llm.invoke([HumanMessage(content=rag_prompt)])
+        # Invoke LLM (Only once!)
         response = llm.invoke([HumanMessage(content=rag_prompt)])
         ai_text = response.content
 
@@ -249,7 +241,6 @@ def answer_node(state: AgentState):
     response = llm.invoke(messages)
     return {"messages": [response]}
 
-
 # ---------------------------------------------------------
 # GRAPH SETUP
 # ---------------------------------------------------------
@@ -262,16 +253,11 @@ workflow.add_node("generate", answer_node)
 
 workflow.set_entry_point("router")
 
-
 def route_logic(state):
     decision = state["context"]
-    if decision == "vectorstore":
-        return "search"
-    elif decision == "email_tool":
-        return "email"
-    else:
-        return "generate"
-
+    if decision == "vectorstore": return "search"
+    elif decision == "email_tool": return "email"
+    else: return "generate"
 
 workflow.add_conditional_edges("router", route_logic,
                                {"search": "search", "email": "email", "generate": "generate"})
@@ -280,51 +266,36 @@ workflow.add_edge("search", "generate")
 workflow.add_edge("email", "generate")
 workflow.add_edge("generate", END)
 
-
 # ---------------------------------------------------------
-# EXPORT FUNCTION
+# EXPORT
 # ---------------------------------------------------------
-# This function allows main.py to create the agent with a specific checkpointer
 def get_graph_workflow():
     return workflow
 
-
 # ---------------------------------------------------------
-# MAIN LOOP (FIXED: ADDED SETUP())
+# MAIN
 # ---------------------------------------------------------
 if __name__ == "__main__":
     print(f"⚡ Connecting to Redis at {REDIS_URL}...")
 
-    # Open connection
     with RedisSaver.from_conn_string(REDIS_URL) as checkpointer:
-
-        # 1. INITIALIZE INDICES (Crucial Step!)
-        # This creates the 'checkpoint_write' and 'checkpoint_migrations' indices in Redis
         print("🔧 Setting up Redis Indices...")
         checkpointer.setup()
 
-        # 2. Compile graph with the ready checkpointer
         app = workflow.compile(checkpointer=checkpointer)
-
-        print("🤖 Agent V5 (With Redis Memory) Online.")
+        print("🤖 Agent V6 (Fixes: Indo Router + Search Cleaner) Online.")
 
         config = {"configurable": {"thread_id": "stephen_session_1"}}
 
         while True:
             try:
                 user_input = input("\nYou: ")
-                if user_input.lower() in ["quit", "exit"]:
-                    break
+                if user_input.lower() in ["quit", "exit"]: break
 
-                for event in app.stream(
-                    {"messages": [HumanMessage(content=user_input)]},
-                    config=config
-                ):
+                for event in app.stream({"messages": [HumanMessage(content=user_input)]}, config=config):
                     if "generate" in event:
                         ai_reply = event['generate']['messages'][-1].content
                         print(f"AI: {ai_reply}")
             except Exception as e:
                 print(f"❌ Error: {e}")
-                import traceback
-                traceback.print_exc()
                 break
