@@ -7,6 +7,7 @@ from qdrant_client.http import models
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 from langchain_core.messages import HumanMessage
+from urllib.parse import quote
 
 # 1. Load Config (Points to your Windows PC)
 load_dotenv()
@@ -125,11 +126,13 @@ def ingest_file(file_path, user_id="u_default"):
     
     # Batch embedding (More efficient)
     vectors = embed_model.embed_documents(chunks)
-    
+    safe_filename = quote(filename, safe="")
+
     for i, (chunk, vector) in enumerate(zip(chunks, vectors)):
         payload = {
             "filename": filename,
             "user_id": user_id,
+            "file_url": f'{QDRANT_URL}/{collection_name}/{filename}'
             "text": chunk, # We store the text so we can retrieve it later!
             "chunk_id": i
         }
