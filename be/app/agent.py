@@ -228,42 +228,42 @@ def get_graph_workflow():
     return workflow
 
 
-# # ---------------------------------------------------------
-# # MAIN LOOP (FIXED: ADDED SETUP())
-# # ---------------------------------------------------------
-# if __name__ == "__main__":
-#     print(f"⚡ Connecting to Redis at {REDIS_URL}...")
+# ---------------------------------------------------------
+# MAIN LOOP (FIXED: ADDED SETUP())
+# ---------------------------------------------------------
+if __name__ == "__main__":
+    print(f"⚡ Connecting to Redis at {REDIS_URL}...")
 
-#     # Open connection
-#     with RedisSaver.from_conn_string(REDIS_URL) as checkpointer:
+    # Open connection
+    with RedisSaver.from_conn_string(REDIS_URL) as checkpointer:
         
-#         # 1. INITIALIZE INDICES (Crucial Step!)
-#         # This creates the 'checkpoint_write' and 'checkpoint_migrations' indices in Redis
-#         print("🔧 Setting up Redis Indices...")
-#         checkpointer.setup() 
+        # 1. INITIALIZE INDICES (Crucial Step!)
+        # This creates the 'checkpoint_write' and 'checkpoint_migrations' indices in Redis
+        print("🔧 Setting up Redis Indices...")
+        checkpointer.setup() 
 
-#         # 2. Compile graph with the ready checkpointer
-#         app = workflow.compile(checkpointer=checkpointer)
+        # 2. Compile graph with the ready checkpointer
+        app = workflow.compile(checkpointer=checkpointer)
         
-#         print("🤖 Agent V5 (With Redis Memory) Online.")
+        print("🤖 Agent V5 (With Redis Memory) Online.")
         
-#         config = {"configurable": {"thread_id": "stephen_session_1"}}
+        config = {"configurable": {"thread_id": "stephen_session_1"}}
         
-#         while True:
-#             try:
-#                 user_input = input("\nYou: ")
-#                 if user_input.lower() in ["quit", "exit"]:
-#                     break
+        while True:
+            try:
+                user_input = input("\nYou: ")
+                if user_input.lower() in ["quit", "exit"]:
+                    break
                     
-#                 for event in app.stream(
-#                     {"messages": [HumanMessage(content=user_input)]}, 
-#                     config=config
-#                 ):
-#                     if "generate" in event:
-#                         ai_reply = event['generate']['messages'][-1].content
-#                         print(f"AI: {ai_reply}")
-#             except Exception as e:
-#                 print(f"❌ Error: {e}")
-#                 import traceback
-#                 traceback.print_exc()
-#                 break
+                for event in app.stream(
+                    {"messages": [HumanMessage(content=user_input)]}, 
+                    config=config
+                ):
+                    if "generate" in event:
+                        ai_reply = event['generate']['messages'][-1].content
+                        print(f"AI: {ai_reply}")
+            except Exception as e:
+                print(f"❌ Error: {e}")
+                import traceback
+                traceback.print_exc()
+                break
