@@ -114,11 +114,13 @@ def ingest_file(file_path, user_id="u_default"):
 
     # 3. Create metadata for each chunk
     # This ensures every chunk knows which file it belongs to
+    safe_filename = quote(filename)
+
     metadatas = [
         {
             "filename": filename,
             "user_id": user_id,
-            "file_url": f'http://{WINDOWS_IP}:6333/dashboard#/collections/{collection_name}', # Or your custom storage URL
+            "file_url": f'http://{WINDOWS_IP}:9000/browser/uploads/{safe_filename}',
             "chunk_id": i
         } 
         for i in range(len(chunks))
