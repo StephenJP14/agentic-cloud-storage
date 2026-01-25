@@ -1,5 +1,6 @@
 import os
 import base64
+import uuid
 import fitz  # PyMuPDF
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
@@ -136,9 +137,10 @@ def ingest_file(file_path, user_id="u_default"):
             "text": chunk, # We store the text so we can retrieve it later!
             "chunk_id": i
         }
-        
+
+        point_id = str(uuid.uuid4())
         points.append(models.PointStruct(
-            id=i,  # Ideally use UUID here
+            id=point_id,  # Ideally use UUID here
             vector=vector,
             payload=payload
         ))

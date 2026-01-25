@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 # ---------------------------------------------------------
 from langgraph.checkpoint.redis import RedisSaver
 from redis import Redis
-
+import json
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
@@ -145,20 +145,37 @@ def router_node(state: AgentState):
 def search_node(state: AgentState):
     last_message = state["messages"][-1].content
     
-    # Perform search but get the full Document objects
-    results = vector_store.similarity_search(last_message, k=1) 
+    # --- INTELLIGENT QUERY CLEANING ---
+    analyze_prompt = f"""You are a search query optimizer.
+    The user is asking to search for documents.
+    
+    TASK:
+    1. Remove "meta-instructions" like "call tools", "use search", "panggil", "tolong", "find".
+    2. Extract ONLY the *subject* they want (e.g., "CV", "Resume", "Skills", "Experience").
+    3. If they just say "my cv", the keyword is "CV".
+    
+    User Request: "{last_message}"
+    
+    Output ONLY the clean keywords.
+    """
+    
+    # Run the cleaning
+    optimized_query = llm.invoke(analyze_prompt).content
+    print(f"   [OPTIMIZER] 🔄 Original: '{last_message}' -> Clean: '{optimized_query}'")
+    
+    # Search with the CLEAN keywords (e.g., just "CV")
+    results = vector_store.similarity_search(optimized_query, k=5) # Increase k to 5 to get more context
     
     if not results:
         return {"messages": [SystemMessage(content="No docs found.")], "file_url": ""}
 
-    # Extract content and the URL/Path from metadata
-    content = results[0].page_content
-    # Assuming your ingestion script stored the path in 'metadata'
+    # Combine ALL chunks found (not just the first one)
+    content = "\n\n---\n\n".join([doc.page_content for doc in results])
     source_url = results[0].metadata.get("file_url", "Unknown Link") 
 
     return {
         "messages": [SystemMessage(content=f"DOCUMENT CONTEXT:\n{content}")],
-        "file_url": source_url # Store the URL in the state
+        "file_url": source_url 
     }
 
 
@@ -198,19 +215,22 @@ def answer_node(state: AgentState):
         # We explicitly tell it how to read a document (CVs usually have names at the top).
         rag_prompt = f"""You are an intelligent document analyst.
         
-        USER QUESTION: 
-        "{user_question}"
-
-        DOCUMENT CONTENT (Retrieved from Database):
+        USER'S ORIGINAL REQUEST: "{user_question}"
+        
+        RETRIEVED DOCUMENT CONTENT:
         --------------------------------------------------
         {context_data}
         --------------------------------------------------
 
         INSTRUCTIONS:
-        1. Analyze the Document Content above carefully.
-        2. Answer the User Question using the information in the document.
-        3. NOTE: If the document looks like a CV or Resume, the Name is usually at the very top, and Contact Info is near it.
-        4. If the answer is truly missing, say "I couldn't find that information in the document."
+        1. The user might be asking you to "find", "read", or "analyze" this file.
+        2. DO NOT interpret their request as a question about "how to use tools".
+        3. Instead, fulfill the INTENT:
+           - If they ask for "CV", summarize the skills and experience found in the text.
+           - If they ask "What are my skills?", list them from the text.
+        4. IGNORE phrases like "call tools" or "use vectorstore". Focus on the DOCUMENT CONTENT.
+        
+        Output the analysis now:
         """
 
         # 3. Invoke LLM with this focused prompt
