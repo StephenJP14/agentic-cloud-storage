@@ -115,6 +115,7 @@ class AgentState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     context: str
     file_url: str
+    filename: str
 
 def get_history_text(messages):
     recent = messages[-5:]
@@ -206,10 +207,12 @@ def search_node(state: AgentState):
 
     content = "\n\n---\n\n".join([doc.page_content for doc in results])
     source_url = results[0].metadata.get("file_url", "Unknown Link") 
+    source_filename = results[0].metadata.get("filename", "Unknown File") 
 
     return {
         "messages": [SystemMessage(content=f"DOCUMENT CONTEXT:\n{content}")],
-        "file_url": source_url 
+        "file_url": source_url ,
+        "filename": source_filename,
     }
 
 def email_node(state: AgentState):
@@ -224,6 +227,7 @@ def answer_node(state: AgentState):
     messages = state["messages"]
     last_message = messages[-1]
     file_url = state.get("file_url", "No Link Available")
+    filename = state.get("filename", "No File Available")
 
     # CHECK: Is this a RAG response?
     if isinstance(last_message, SystemMessage) and "DOCUMENT CONTEXT" in last_message.content:
@@ -263,7 +267,8 @@ def answer_node(state: AgentState):
 
         final_json = {
             "answer": ai_text,
-            "file_url": file_url
+            "file_url": file_url,
+            "filename": filename
         }
 
         return {"messages": [AIMessage(content=json.dumps(final_json))]}
