@@ -1,11 +1,13 @@
 import os
+import json
 import shutil
 import time
-from typing import Optional
+from typing import Optional, List, Any
 
 # FastAPI Imports
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -14,16 +16,14 @@ from db.postgres import get_db
 from db.minio_client import minio_client, bucket_name
 from db.redis_client import redis_client
 
-# AI Imports (From your app folder)
-# Ensure ingest_service and agent are correctly imported
+# AI Imports
 from app.ingest_service import ingest_file
-from app.agent import workflow, REDIS_URL
+from app.agent import workflow, REDIS_URL, llm, build_rag_prompt
 from langgraph.checkpoint.redis import RedisSaver
 from langchain_core.messages import HumanMessage
 
 app = FastAPI()
 
-# Enable CORS (Allow frontend access)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -41,60 +41,140 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str
+    citations: List[Any] = []
 
 # ---------------------------------------------------------
-# STARTUP EVENT (Initialize Redis Indices)
+# STARTUP EVENT
 # ---------------------------------------------------------
 @app.on_event("startup")
 def startup_event():
-    """Ensures Redis Search Indices are created when API starts."""
     try:
         print("⚙️ Startup: Verifying Redis Indices...")
-        # We use a context manager to safely open/close the connection
         with RedisSaver.from_conn_string(REDIS_URL) as checkpointer:
             checkpointer.setup()
         print("✅ Redis Indices Ready.")
     except Exception as e:
-        # It's okay if they already exist, just log a warning
         print(f"⚠️ Redis Setup Note: {e}")
 
 # ---------------------------------------------------------
-# ENDPOINTS
+# STREAMING CHAT ENDPOINT (SSE)
 # ---------------------------------------------------------
+@app.post("/chat/stream")
+async def chat_stream(request: ChatRequest):
+    """
+    Server-Sent Events endpoint. Streams pipeline status updates 
+    followed by token-by-token answer generation.
+    
+    SSE event types:
+      {"status": "<node_name>"}  — pipeline progress
+      {"status": "generating"}   — answer generation starting
+      {"token": "<text>"}        — streamed answer token
+      {"done": true, "citations": [...]} — stream complete
+      {"error": "<message>"}     — error occurred
+    """
+    def generate():
+        try:
+            with RedisSaver.from_conn_string(REDIS_URL) as checkpointer:
+                agent_app = workflow.compile(checkpointer=checkpointer)
+                config = {"configurable": {"thread_id": request.thread_id}}
+                
+                # --- Phase 1: Run pipeline (router → expand → search → grade) ---
+                pipeline_state = {}
+                for update in agent_app.stream(
+                    {"messages": [HumanMessage(content=request.message)]},
+                    config=config,
+                    stream_mode="updates"
+                ):
+                    node_name = list(update.keys())[0]
+                    if node_name == "__end__":
+                        continue
+                    node_data = list(update.values())[0]
+                    pipeline_state.update(node_data)
+                    yield f"data: {json.dumps({'status': node_name})}\n\n"
+                
+                context = pipeline_state.get("context", "chitchat")
+                yield f"data: {json.dumps({'status': 'generating'})}\n\n"
+                
+                # --- Phase 2: Stream the answer token-by-token ---
+                if context == "vectorstore":
+                    docs = pipeline_state.get("filtered_docs", [])
+                    
+                    if not docs:
+                        yield f"data: {json.dumps({'token': 'Maaf, tidak ada informasi relevan di dalam dokumen yang diunggah.'})}\n\n"
+                        yield f"data: {json.dumps({'done': True, 'citations': []})}\n\n"
+                        return
+                    
+                    prompt = build_rag_prompt(docs, request.message)
+                    for chunk in llm.stream([HumanMessage(content=prompt)]):
+                        if chunk.content:
+                            yield f"data: {json.dumps({'token': chunk.content})}\n\n"
+                    
+                    # Build citations from doc metadata (no extra LLM call needed)
+                    citations = []
+                    for d in docs:
+                        citations.append({
+                            "filename": d.metadata.get("filename", ""),
+                            "source_type": d.metadata.get("source_type", ""),
+                            "file_url": d.metadata.get("file_url", ""),
+                        })
+                    yield f"data: {json.dumps({'done': True, 'citations': citations})}\n\n"
+                else:
+                    # Chitchat — stream directly
+                    for chunk in llm.stream([HumanMessage(content=request.message)]):
+                        if chunk.content:
+                            yield f"data: {json.dumps({'token': chunk.content})}\n\n"
+                    yield f"data: {json.dumps({'done': True, 'citations': []})}\n\n"
+                    
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+    
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+    )
 
+# ---------------------------------------------------------
+# NON-STREAMING CHAT ENDPOINT (kept for backwards compat)
+# ---------------------------------------------------------
 @app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
-    """
-    Talk to the AI Agent.
-    - Uses LangGraph for logic.
-    - Uses Redis for persistent memory (thread_id).
-    """
     try:
-        # 1. Initialize Redis Checkpointer per request
         with RedisSaver.from_conn_string(REDIS_URL) as checkpointer:
-            
-            # 2. Compile the Graph with Persistence
             agent_app = workflow.compile(checkpointer=checkpointer)
-            
-            # 3. Prepare Config (Memory Key)
             config = {"configurable": {"thread_id": request.thread_id}}
             
-            # 4. Invoke the Agent
-            # Use .invoke() for a single Request/Response cycle
             result = agent_app.invoke(
                 {"messages": [HumanMessage(content=request.message)]},
                 config=config
             )
             
-            # 5. Extract Last AI Message
-            last_message = result["messages"][-1].content
-            return {"response": last_message}
+            context = result.get("context", "chitchat")
+            
+            if context == "vectorstore":
+                docs = result.get("filtered_docs", [])
+                if not docs:
+                    return {"response": "Maaf, tidak ada informasi relevan di dalam dokumen yang diunggah.", "citations": []}
+                
+                prompt = build_rag_prompt(docs, request.message)
+                response = llm.invoke([HumanMessage(content=prompt)])
+                
+                citations = [
+                    {"filename": d.metadata.get("filename", ""), "source_type": d.metadata.get("source_type", "")}
+                    for d in docs
+                ]
+                return {"response": response.content, "citations": citations}
+            else:
+                response = llm.invoke([HumanMessage(content=request.message)])
+                return {"response": response.content, "citations": []}
 
     except Exception as e:
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
-
+    
 
 @app.post("/upload/")
 async def upload_file(
@@ -150,7 +230,7 @@ def process_ingestion(file_path: str, filename: str):
         ingest_file(file_path) 
         print(f"✅ Background: Ingestion complete for {filename}")
     except Exception as e:
-        print(f"❌ Background: Ingestion failed: {e}")
+        print(f"❌ Background Ingestion failed: {e}")
     finally:
         # Cleanup temp file
         if os.path.exists(file_path):

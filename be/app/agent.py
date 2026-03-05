@@ -4,48 +4,34 @@ from typing import TypedDict, Literal, Annotated
 from dotenv import load_dotenv
 
 from langgraph.checkpoint.redis import RedisSaver
-from langchain_ollama import ChatOllama, OllamaEmbeddings
-from langchain_qdrant import QdrantVectorStore
+from langchain_ollama import ChatOllama
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, BaseMessage
-from langchain_core.tools import tool
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.documents import Document
+
 from pydantic import BaseModel, Field
+from .embed_model import get_embed_model
+
+from langchain_community.document_compressors.flashrank_rerank import FlashrankRerank
 
 load_dotenv()
-WINDOWS_IP = os.getenv("WINDOWS_IP")
+WINDOWS_IP = os.getenv("WINDOWS_IP", "127.0.0.1")
 OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", f"http://{WINDOWS_IP}:11434")
 QDRANT_URL = os.getenv("QDRANT_URL", f"http://{WINDOWS_IP}:6333")
 REDIS_URL = os.getenv("REDIS_URL", f"redis://{WINDOWS_IP}:6379")
 
-# Setup Vector DB
 client = QdrantClient(url=QDRANT_URL)
-embeddings = OllamaEmbeddings(base_url=OLLAMA_URL, model="bge-m3")
 collection_name = "user_docs"
 
-try:
-    client.get_collection(collection_name=collection_name)
-except Exception:
-    client.create_collection(
-        collection_name=collection_name,
-        vectors_config=models.VectorParams(size=1024, distance=models.Distance.COSINE)
-    )
+compressor = FlashrankRerank(model="ms-marco-MiniLM-L-12-v2", top_n=15)
 
-vector_store = QdrantVectorStore(
-    client=client,
-    collection_name=collection_name,
-    embedding=embeddings,
-    content_payload_key="text"
-)
+llm = ChatOllama(base_url=OLLAMA_URL, model="qwen3-vl:8b-instruct", temperature=0.1, num_ctx=8192)
 
-# Gunakan model Qwen baru untuk Reasoning Chatbot
-llm = ChatOllama(base_url=OLLAMA_URL, model="qwen3-vl:8b-instruct", temperature=0.1)
-
-# ROUTER
 class RouteQuery(BaseModel):
     datasource: Literal["vectorstore", "chitchat"] = Field(..., description="Route target")
 
@@ -55,10 +41,17 @@ router_prompt = ChatPromptTemplate.from_messages([
 ])
 router_chain = router_prompt | llm.with_structured_output(RouteQuery)
 
+# ==========================================
+# Agent State
+# ==========================================
 class AgentState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     context: str
     file_url: str
+    search_queries: list[str]
+    retrieved_docs: list[Document]
+    filtered_docs: list[Document]
+    loop_count: int
 
 def get_history_text(messages):
     return "\n".join([f"{'User' if isinstance(m, HumanMessage) else 'AI'}: {m.content}" for m in messages[-4:]])
@@ -69,78 +62,173 @@ def router_node(state: AgentState):
         decision = router_chain.invoke({"question": last_message}).datasource
     except:
         decision = "chitchat"
+    print(f"🧭 [ROUTER] Keputusan: {decision}")
     return {"context": decision}
 
-# 🚀 NEW RETRIEVAL STRATEGY: HyDE (Hypothetical Document Embeddings)
+def expand_query_node(state: AgentState):
+    """
+    Strategy #6: Multi-Query RAG. 
+    Expands the user query into 3 distinct variations for better recall.
+    """
+    original_query = state["messages"][-1].content
+    print(f"🧠 [MULTI-QUERY] Mengekspansi: '{original_query}'")
+    
+    prompt = f"""Sebagai AI Architect, kembangkan kueri pengguna berikut menjadi 3 kueri pencarian mandiri untuk sistem Retrieval-Augmented Generation (RAG). 
+    Fokus pada penambahan kata kunci teknis, sinonim industri, dan variasi frasa agar sistem dapat menangkap dokumen yang relevan meskipun kosa katanya berbeda.
+    
+    Kueri asli: {original_query}
+    
+    Output HANYA 3 baris teks, tanpa penomoran, tanpa tanda kutip, dan tanpa pengantar."""
+    
+    response = llm.invoke(prompt).content
+    queries = [q.strip() for q in response.split('\n') if q.strip()]
+    if original_query not in queries:
+        queries.insert(0, original_query)
+        
+    return {"search_queries": queries[:4], "loop_count": state.get("loop_count", 0) + 1}
+
 def search_node(state: AgentState):
-    messages = state["messages"]
-    last_message = messages[-1].content
-    history_text = get_history_text(messages[:-1]) 
+    embed_model = get_embed_model() 
+    queries = state["search_queries"]
+    all_raw_results = []
     
-    # Langsung suruh Qwen3 untuk menjelaskan materinya sebelum mencari
-    hyde_prompt = f"""Sebagai asisten akademik, user bertanya: '{last_message}'.
-    Konteks riwayat: {history_text}
+    print(f"📡 [RETRIEVAL] Menjalankan Hybrid Search untuk {len(queries)} variasi kueri...")
     
-    Tuliskan penjelasan singkat (1 paragraf) tentang konsep akademik yang dicari. 
-    Jika user menggunakan analogi umum, ubah menjadi istilah akademis/teknis yang benar (contoh: 'pill' dalam OOP berarti 'Encapsulation').
-    Tulis langsung tebakannya secara akademis tanpa kata pengantar."""
-    
-    hypothetical_doc = llm.invoke(hyde_prompt).content
-    print(f"   [HyDE] 🧠 Hipotesis Akademik: '{hypothetical_doc}'")
-    
-    # Mencari berdasarkan hipotesis, BUKAN berdasarkan pertanyaan mentah user
-    results = vector_store.similarity_search_with_score(hypothetical_doc, k=4)
-    
-    # Filtering threshold untuk membuang dokumen yang melenceng
-    valid_results = [doc for doc, score in results if score >= 0.35]
-    
-    if not valid_results:
-        return {"messages": [SystemMessage(content="No relevant academic docs found.")], "file_url": ""}
-
-    content = "\n\n---\n\n".join([doc.page_content for doc in valid_results])
-    source_url = valid_results[0].metadata.get("file_url", "Unknown Link") 
-
-    return {
-        "messages": [SystemMessage(content=f"DOCUMENT CONTEXT:\n{content}")],
-        "file_url": source_url 
-    }
-
-def answer_node(state: AgentState):
-    messages = state["messages"]
-    last_message = messages[-1]
-    file_url = state.get("file_url", "")
-
-    if isinstance(last_message, SystemMessage) and "DOCUMENT CONTEXT" in last_message.content:
-        user_question = messages[-2].content if len(messages) > 1 else "Jelaskan."
+    for q in queries:
+        query_embeddings = embed_model.encode(q, return_dense=True, return_sparse=True)
+        dense_vec = query_embeddings['dense_vecs'].tolist()
+        lexical_weights = query_embeddings['lexical_weights']
         
-        rag_prompt = f"""Anda adalah dosen AI. Jawab pertanyaan mahasiswa berdasarkan dokumen di bawah ini.
-        Jika dokumen tidak memuat jawaban yang relevan, katakan Anda tidak tahu.
+        tokens = list(lexical_weights.keys())
+        weights = list(lexical_weights.values())
+        token_ids = embed_model.tokenizer.convert_tokens_to_ids(tokens)
         
-        PERTANYAAN: "{user_question}"
+        dedup_sparse = {}
+        for idx, w in zip(token_ids, weights):
+            if idx not in dedup_sparse or w > dedup_sparse[idx]:
+                dedup_sparse[idx] = w
         
-        DOKUMEN:
-        {last_message.content}
-        """
-        
-        response = llm.invoke([HumanMessage(content=rag_prompt)])
-        final_json = {"answer": response.content, "file_url": file_url}
-        return {"messages": [AIMessage(content=json.dumps(final_json))]}
+        sparse_vector = models.SparseVector(
+            indices=list(dedup_sparse.keys()),
+            values=list(dedup_sparse.values())
+        )
 
-    response = llm.invoke(messages)
-    return {"messages": [response]}
+        raw_results = client.query_points(
+            collection_name=collection_name,
+            prefetch=[
+                models.Prefetch(query=dense_vec, using="", limit=10),
+                models.Prefetch(query=sparse_vector, using="sparse", limit=10),
+            ],
+            query=models.FusionQuery(fusion=models.Fusion.RRF),
+            limit=10,
+            with_payload=True
+        ).points
+        
+        all_raw_results.extend(raw_results)
+        
+    unique_results = {res.payload['chunk_id']: res for res in all_raw_results}.values()
+    
+    retrieved_docs = [
+        Document(page_content=p.payload["text"], metadata=p.payload)
+        for p in unique_results
+    ]
+    
+    original_query = state["messages"][-1].content
+    reranked_docs = compressor.compress_documents(documents=retrieved_docs, query=original_query)
+    
+    file_url = ""
+    if reranked_docs:
+        file_url = reranked_docs[0].metadata.get("file_url", "")
+    
+    print(f"✨ [RESULT] {len(reranked_docs)} dokumen setelah reranking.")
+    return {"retrieved_docs": list(reranked_docs), "file_url": file_url}
 
+def grade_context_node(state: AgentState):
+    """Anti-Hallucination Gatekeeper — grades document relevance."""
+    docs = state["retrieved_docs"]
+    question = state["messages"][-1].content
+    filtered = []
+    
+    print("⚖️ [GRADING] Memvalidasi relevansi dokumen...")
+    for doc in docs:
+        prompt = f"""Does the following document contain ANY information that could be even slightly helpful in answering this question? 
+        Question: {question}
+        Document: {doc.page_content}
+        Answer ONLY 'yes' or 'no'."""
+        
+        score = llm.invoke(prompt).content.strip().lower()
+        if 'yes' in score:
+            filtered.append(doc)
+            
+    print(f"🛡️ [FILTER] Lolos filter: {len(filtered)} dari {len(docs)} dokumen.")
+    return {"filtered_docs": filtered}
+
+# ==========================================
+# RAG Prompt Builder (used by main.py for both streaming & non-streaming)
+# ==========================================
+def build_rag_prompt(docs: list[Document], user_question: str) -> str:
+    formatted_docs = "\n\n".join([
+        f"[NAMA FILE: {d.metadata.get('filename')}] [SUMBER: {d.metadata.get('source_type')}]\n{d.page_content}" 
+        for d in docs
+    ])
+    return f"""Anda adalah asisten akademik Agentic AI. Jawab pertanyaan berdasarkan DOKUMEN di bawah.
+ATURAN KRUSIAL:
+1. Jika terdapat kontradiksi antara sumber TEKS dan GAMBAR/DIAGRAM, sebutkan perbedaannya secara eksplisit.
+2. Jangan menebak. Gunakan HANYA informasi dari dokumen.
+3. Jawab dengan lengkap dan jelas dalam bahasa yang sesuai pertanyaan.
+
+PERTANYAAN: "{user_question}"
+
+DOKUMEN:
+{formatted_docs}
+"""
+
+# ==========================================
+# New Conditional Routing Logic
+# ==========================================
+def check_hallucination_and_retry(state: AgentState):
+    """
+    Decides whether to proceed to generation or loop back if all docs were irrelevant.
+    """
+    filtered_docs = state.get("filtered_docs", [])
+    loop_count = state.get("loop_count", 0)
+    
+    if len(filtered_docs) == 0:
+        if loop_count < 3: # Max 3 retries
+            print(f"🔄 [RETRY] Dokumen tidak relevan. Mencoba lagi... (Attempt {loop_count}/3)")
+            return "expand_query"
+        else:
+            print("🛑 [STOP] Batas loop tercapai. Melanjutkan dengan konteks kosong.")
+            return "done"
+    
+    print("✅ [SUCCESS] Dokumen relevan ditemukan. Lanjut ke generasi jawaban.")
+    return "done"
+
+
+# ==========================================
+# Graph Architecture (Updated with Cycles)
+# ==========================================
 workflow = StateGraph(AgentState)
 workflow.add_node("router", router_node)
+workflow.add_node("expand_query", expand_query_node)
 workflow.add_node("search", search_node)
-workflow.add_node("generate", answer_node)
+workflow.add_node("grade", grade_context_node)
+
 workflow.set_entry_point("router")
 
 def route_logic(state):
-    return "search" if state["context"] == "vectorstore" else "generate"
+    return "expand_query" if state["context"] == "vectorstore" else "done"
 
-workflow.add_conditional_edges("router", route_logic, {"search": "search", "generate": "generate"})
-workflow.add_edge("search", "generate")
-workflow.add_edge("generate", END)
+workflow.add_conditional_edges("router", route_logic, {
+    "expand_query": "expand_query",
+    "done": END
+})
 
-def get_graph_workflow():
-    return workflow
+workflow.add_edge("expand_query", "search")
+workflow.add_edge("search", "grade")
+
+# [FIX: Add the cyclic edge to enable Self-Reflective RAG]
+workflow.add_conditional_edges("grade", check_hallucination_and_retry, {
+    "expand_query": "expand_query", # Loop back to expand/rewrite
+    "done": END
+})

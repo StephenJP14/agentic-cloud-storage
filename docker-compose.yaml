@@ -38,3 +38,14 @@ services:
       POSTGRES_DB: agent_db
     volumes:
       - ./postgres_data:/var/lib/postgresql/data
+  
+  # 5. Database GUI (pgAdmin)
+  pgadmin:
+    image: dpage/pgadmin4
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: password123
+    depends_on:
+      - postgres

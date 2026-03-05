@@ -21,6 +21,10 @@ langchain-text-splitters # Needed to chunk text before Qdrant storage
 langchain-community
 langchain-qdrant
 langgraph-checkpoint-redis
+FlagEmbedding
+transformers>=4.45   # AutoTokenizer + AutoModelForImageTextToText
+docling              # Semantic document conversion & chunking
+flashrank            # Cross-encoder reranking
 
 # --- Utilities ---
 httpx                # Required for async API calls within FastAPI
