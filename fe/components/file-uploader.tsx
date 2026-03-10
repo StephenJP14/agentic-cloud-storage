@@ -58,7 +58,7 @@ export default function FileUploader({ initialFile, onComplete }: Props) {
             console.log("Starting upload to FastAPI...");
 
             // 2. Make the API call
-            const response = await fetch('http://localhost:8000/upload/', {
+            const response = await fetch('https://pmdbx2lg-8000.asse.devtunnels.ms/upload/', {
                 method: 'POST',
                 body: formData,
                 // Note: Don't set 'Content-Type' header manually; 

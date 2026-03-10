@@ -27,19 +27,29 @@ REDIS_URL = os.getenv("REDIS_URL", f"redis://{WINDOWS_IP}:6379")
 
 client = QdrantClient(url=QDRANT_URL)
 collection_name = "user_docs"
+collection_summ = "docs_summ" # NEW: Reference the summary collection
 
 compressor = FlashrankRerank(model="ms-marco-MiniLM-L-12-v2", top_n=15)
 
 llm = ChatOllama(base_url=OLLAMA_URL, model="qwen3-vl:8b-instruct", temperature=0.1, num_ctx=8192)
 
+
+# ==========================================
+# Update Router Logic
+# ==========================================
 class RouteQuery(BaseModel):
-    datasource: Literal["vectorstore", "chitchat"] = Field(..., description="Route target")
+    datasource: Literal["vectorstore", "chitchat", "summarize"] = Field(..., description="Route target")
+    query_intent: str = Field(default="", description="The specific topic or document name to summarize")
 
 router_prompt = ChatPromptTemplate.from_messages([
-    ("system", "Berdasarkan pertanyaan user, tentukan routing. Jika butuh baca file/materi kuliah, pilih 'vectorstore'. Jika sapaan biasa, 'chitchat'."),
+    ("system", """Berdasarkan pertanyaan user, tentukan routing:
+    - Jika butuh mencari fakta spesifik/menjawab pertanyaan teknis dari dokumen, pilih 'vectorstore'.
+    - Jika meminta ringkasan, kesimpulan, atau summary SELURUH dokumen/topik, pilih 'summarize' dan ekstrak topik/nama filenya.
+    - Jika sapaan biasa, pilih 'chitchat'."""),
     ("human", "{question}"),
 ])
 router_chain = router_prompt | llm.with_structured_output(RouteQuery)
+
 
 # ==========================================
 # Agent State
@@ -64,6 +74,91 @@ def router_node(state: AgentState):
         decision = "chitchat"
     print(f"🧭 [ROUTER] Keputusan: {decision}")
     return {"context": decision}
+
+# ==========================================
+# NEW: Summary Retrieval Node
+# ==========================================
+def fetch_summary_node(state: AgentState):
+    """Bypasses standard RAG and fetches pre-computed summaries using Hybrid Search + Reranking."""
+    question = state["messages"][-1].content
+    embed_model = get_embed_model()
+    
+    print("📚 [SUMMARY] Mengambil pre-computed summary via Hybrid Search...")
+    
+    # Encode with both dense and sparse vectors for Hybrid Search
+    query_embeddings = embed_model.encode(question, return_dense=True, return_sparse=True)
+    dense_vec = query_embeddings['dense_vecs'].tolist()
+    lexical_weights = query_embeddings['lexical_weights']
+    
+    # Token deduplication for sparse vector
+    tokens = list(lexical_weights.keys())
+    weights = list(lexical_weights.values())
+    token_ids = embed_model.tokenizer.convert_tokens_to_ids(tokens)
+    
+    dedup_sparse = {}
+    for idx, w in zip(token_ids, weights):
+        if idx not in dedup_sparse or w > dedup_sparse[idx]:
+            dedup_sparse[idx] = w
+    
+    sparse_vector = models.SparseVector(
+        indices=list(dedup_sparse.keys()),
+        values=list(dedup_sparse.values())
+    )
+    
+    # Hybrid Search with RRF Fusion (same strategy as search_node)
+    results = client.query_points(
+        collection_name=collection_summ,
+        prefetch=[
+            models.Prefetch(query=dense_vec, using="", limit=5),
+            models.Prefetch(query=sparse_vector, using="sparse", limit=5),
+        ],
+        query=models.FusionQuery(fusion=models.Fusion.RRF),
+        limit=5,
+        with_payload=True
+    ).points
+    
+    if not results:
+        return {"messages": [AIMessage(content="Maaf, saya tidak menemukan ringkasan dokumen yang relevan di sistem.")]}
+    
+    # Convert to Documents for reranking
+    summary_docs = [
+        Document(page_content=p.payload["text"], metadata=p.payload)
+        for p in results
+    ]
+    
+    # Rerank summaries for relevance
+    reranked_summaries = compressor.compress_documents(documents=summary_docs, query=question)
+    print(f"✨ [SUMMARY] {len(reranked_summaries)} ringkasan setelah reranking.")
+    
+    if not reranked_summaries:
+        return {"messages": [AIMessage(content="Maaf, saya tidak menemukan ringkasan dokumen yang relevan di sistem.")]}
+    
+    # Build prompt from reranked results
+    retrieved_summaries = "\n\n".join([
+        f"Sumber: {d.metadata.get('filename')}\n{d.page_content}" 
+        for d in reranked_summaries
+    ])
+    
+    print("📊 [INSIGHT] Ringkasan yang diambil:")
+    print(retrieved_summaries)
+
+    print("📖 [PROMPT] Membangun prompt untuk generasi jawaban...")
+
+    prompt = f"""Anda adalah asisten akademik. Tugas Anda ADALAH merangkum materi berdasarkan Data Ringkasan yang diberikan di bawah ini. 
+    ATURAN KRUSIAL:
+    1. JANGAN meminta pengguna untuk mengirimkan materi. Materinya sudah ada di Data Ringkasan.
+    2. Gunakan HANYA informasi dari Data Ringkasan.
+    
+    Data Ringkasan:
+    {retrieved_summaries}
+    
+    Pertanyaan User: {question}"""
+    
+    final_answer = llm.invoke(prompt).content
+    print("✨ [SUMMARY] Ringkasan berhasil diberikan ke user.")
+    
+    # We inject it as a message, and set context to "done" to skip the rest of the graph
+    return {"messages": [AIMessage(content=final_answer)]}
 
 def expand_query_node(state: AgentState):
     """
@@ -213,16 +308,26 @@ workflow.add_node("router", router_node)
 workflow.add_node("expand_query", expand_query_node)
 workflow.add_node("search", search_node)
 workflow.add_node("grade", grade_context_node)
+workflow.add_node("fetch_summary", fetch_summary_node) # NEW NODE
 
 workflow.set_entry_point("router")
 
 def route_logic(state):
-    return "expand_query" if state["context"] == "vectorstore" else "done"
+    if state["context"] == "vectorstore":
+        return "expand_query"
+    elif state["context"] == "summarize":
+        return "fetch_summary"
+    else:
+        return "done"
 
 workflow.add_conditional_edges("router", route_logic, {
     "expand_query": "expand_query",
+    "fetch_summary": "fetch_summary", # NEW ROUTE
     "done": END
 })
+
+# Route summary node directly to END since it handles generation internally
+workflow.add_edge("fetch_summary", END) 
 
 workflow.add_edge("expand_query", "search")
 workflow.add_edge("search", "grade")

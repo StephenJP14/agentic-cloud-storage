@@ -56,7 +56,7 @@ export default function Chat({ isOpen, onClose, fileCount }: ChatProps) {
         setStatusText('Processing…');
 
         try {
-            const response = await fetch('http://localhost:8000/chat/stream', {
+            const response = await fetch('https://pmdbx2lg-8000.asse.devtunnels.ms/chat/stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: userText, thread_id: threadId }),

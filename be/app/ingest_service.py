@@ -23,6 +23,7 @@ QDRANT_URL = os.getenv("QDRANT_URL", f"http://{WINDOWS_IP}:6333")
 local_llm = ChatOllama(base_url=OLLAMA_URL, model="qwen3-vl:8b-instruct", temperature=0.0)
 qdrant = QdrantClient(url=QDRANT_URL)
 collection_name = "user_docs"
+collection_summ = "docs_summ" # NEW: Dedicated summary collection
 
 if not qdrant.collection_exists(collection_name):
     qdrant.create_collection(
@@ -32,6 +33,74 @@ if not qdrant.collection_exists(collection_name):
             "sparse": models.SparseVectorParams(index=models.SparseIndexParams(on_disk=False))
         }
     )
+
+# NEW: Initialize the summary collection (with Hybrid Search support)
+if not qdrant.collection_exists(collection_summ):
+    qdrant.create_collection(
+        collection_name=collection_summ,
+        vectors_config=models.VectorParams(size=1024, distance=models.Distance.COSINE),
+        sparse_vectors_config={
+            "sparse": models.SparseVectorParams(index=models.SparseIndexParams(on_disk=False))
+        }
+    )
+
+
+# ==========================================
+# NEW: Dedicated Map-Reduce Summarization Function
+# ==========================================
+def generate_map_reduce_summary(docling_doc, filename: str, embed_model) -> str:
+    """
+    Executes a sequential Map-Reduce summarization using Context-Aware Chunking.
+    """
+    print(f"🗺️ [MAP] Memulai Map-Reduce summarization untuk {filename}...")
+    
+    # ---------------------------------------------------------
+    # THE ARCHITECT FIX: Use Docling's HybridChunker instead of character slicing.
+    # We set max_tokens much higher (e.g., 3000) for the Map phase so the LLM 
+    # processes entire sections at once, minimizing total loops.
+    # ---------------------------------------------------------
+    chunker = HybridChunker(tokenizer=embed_model.tokenizer, max_tokens=3000, merge_peers=True)
+    chunk_iter = list(chunker.chunk(dl_doc=docling_doc)) 
+    
+    chunk_summaries = []
+    
+    # MAP PHASE
+    for i, chunk in enumerate(chunk_iter):
+        # We can use Docling's contextualize to ensure the header path is included
+        try:
+            text_to_summarize = chunker.contextualize(chunk)
+        except AttributeError:
+            text_to_summarize = chunk.text
+            
+        if not text_to_summarize.strip(): 
+            continue
+            
+        map_prompt = f"""Summarize the following section of a document in 2-3 bullet points.
+        Section: {text_to_summarize}"""
+        
+        try:
+            summary = local_llm.invoke([HumanMessage(content=map_prompt)]).content
+            chunk_summaries.append(summary)
+            print(f"  - Map phase: Chunk {i+1}/{len(chunk_iter)} summarized.")
+        except Exception as e:
+            print(f"⚠️ Map Error on chunk {i+1}: {e}")
+            
+    # REDUCE PHASE
+    print("🧠 [REDUCE] Menggabungkan summary dari semua chunk...")
+    combined_summaries = "\n".join(chunk_summaries)
+    
+    reduce_prompt = f"""Berdasarkan ringkasan dari berbagai bagian dokumen berikut, buatlah satu Executive Summary yang komprehensif, terstruktur, dan mudah dibaca tentang keseluruhan isi dokumen.
+    
+    RINGKASAN BAGIAN:
+    {combined_summaries}
+    
+    Tuliskan ringkasan akhir dalam bahasa Indonesia:"""
+    
+    final_summary = local_llm.invoke([HumanMessage(content=reduce_prompt)]).content
+    print("✅ [REDUCE] Ringkasan akhir selesai dibuat.")
+    
+    return final_summary
+
 
 def generate_contextual_prefix(chunk_text: str, doc_summary: str, filename: str) -> str:
     """
@@ -66,6 +135,54 @@ def ingest_file(file_path, user_id="u_default"):
     converter = DocumentConverter()
     docling_doc = converter.convert(file_path).document
     
+
+    # ---------------------------------------------------------
+    # NEW: Generate and store the full document summary FIRST
+    # ---------------------------------------------------------
+    full_doc_summary = generate_map_reduce_summary(docling_doc, filename, embed_model)
+    
+    # Embed the summary with both Dense and Sparse vectors for Hybrid Search
+    summary_embeddings = embed_model.encode([full_doc_summary], return_dense=True, return_sparse=True)
+    summary_dense_vec = summary_embeddings['dense_vecs'][0]
+    summary_sparse_dict = summary_embeddings['lexical_weights'][0]
+    
+    # Token deduplication for sparse vector (same as chunk ingestion)
+    s_tokens = list(summary_sparse_dict.keys())
+    s_weights = list(summary_sparse_dict.values())
+    s_token_ids = embed_model.tokenizer.convert_tokens_to_ids(s_tokens)
+    
+    s_dedup_sparse = {}
+    for idx, w in zip(s_token_ids, s_weights):
+        if idx not in s_dedup_sparse or w > s_dedup_sparse[idx]:
+            s_dedup_sparse[idx] = w
+    
+    summary_sparse_vector = models.SparseVector(
+        indices=list(s_dedup_sparse.keys()),
+        values=list(s_dedup_sparse.values())
+    )
+    
+    # Upload summary to the new collection
+    summ_point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{user_id}_{filename}_summary"))
+    qdrant.upsert(
+        collection_name=collection_summ,
+        points=[
+            models.PointStruct(
+                id=summ_point_id,
+                vector={"":  summary_dense_vec.tolist(), "sparse": summary_sparse_vector},
+                payload={
+                    "text": full_doc_summary,
+                    "filename": filename,
+                    "source_type": "full_document_summary",
+                    "user_id": user_id,
+                    "file_url": f'http://{WINDOWS_IP}:9000/browser/uploads/{safe_filename}'
+                }
+            )
+        ]
+    )
+    print(f"📤 [QDRANT] Full summary untuk {filename} berhasil diunggah ke '{collection_summ}'.")
+
+
+
     # Generate a brief summary of the whole doc for enrichment
     full_text_preview = docling_doc.export_to_markdown()[:3000]
     doc_summary = local_llm.invoke([

@@ -14,7 +14,7 @@ export default function Dashboard() {
 
     const fetchFiles = async () => {
         try {
-            const response = await fetch('http://localhost:8000/files/');
+            const response = await fetch('https://pmdbx2lg-8000.asse.devtunnels.ms/files/');
             const data = await response.json();
 
             // Map MinIO data to your DriveFile interface
