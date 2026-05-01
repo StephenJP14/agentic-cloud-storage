@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"mime/multipart"
-	"os"
+	// "os"
 	"strconv"
 	"strings"
 	"time"
@@ -60,32 +60,32 @@ func (s *customerServiceService) CreateServiceForm(service models.CustomerServic
 		return models.CustomerService{}, err
 	}
 
-	config := SMTPConfig{
-		Host: os.Getenv("SMTP_HOST"),
-		Port: os.Getenv("SMTP_PORT"),
-		//Username:      os.Getenv("SMTP_USERNAME"),
-		//Password:      os.Getenv("SMTP_PASSWORD"),
-		From: os.Getenv("SMTP_FROM"),
-		//SkipTLSVerify: true,
-		//NoTLS:         true,
-	}
+	// config := SMTPConfig{
+	// 	Host: os.Getenv("SMTP_HOST"),
+	// 	Port: os.Getenv("SMTP_PORT"),
+	// 	//Username:      os.Getenv("SMTP_USERNAME"),
+	// 	//Password:      os.Getenv("SMTP_PASSWORD"),
+	// 	From: os.Getenv("SMTP_FROM"),
+	// 	//SkipTLSVerify: true,
+	// 	//NoTLS:         true,
+	// }
 
-	notifier := NewEmailNotifier(config)
-	recipients := []string{
-		// "Gamalielisaac.Gan@zyrex.com",
-		os.Getenv("SMTP_RECIPIENTS"),
-	}
+	// notifier := NewEmailNotifier(config)
+	// recipients := []string{
+	// 	// "Gamalielisaac.Gan@zyrex.com",
+	// 	os.Getenv("SMTP_RECIPIENTS"),
+	// }
 
-	request := dto.EmailServiceRequest{
-		TicketID:  service.TicketID,
-		Complains: *service.Complaints,
-		Date:      service.ServiceDate,
-	}
+	// request := dto.EmailServiceRequest{
+	// 	TicketID:  service.TicketID,
+	// 	Complains: *service.Complaints,
+	// 	Date:      service.ServiceDate,
+	// }
 
-	if err := notifier.PushEmailNotification(recipients, request); err != nil {
-		fmt.Println("Email notification failed.")
-		// return models.CustomerService{}, err
-	}
+	// if err := notifier.PushEmailNotification(recipients, request); err != nil {
+	// 	fmt.Println("Email notification failed.")
+	// 	// return models.CustomerService{}, err
+	// }
 
 	return createdService, nil
 }
@@ -111,15 +111,15 @@ func (s *customerServiceService) UpdateServiceStatus(ticketID string, status mod
 	if err != nil {
 		return "", ticketId, err
 	}
-	// fmt.Println(serviceData)
-	appEnv := os.Getenv("ENV")
-	if newStatus == string(models.Confirmed) && appEnv != "prod" {
-		qontakService := NewQontakService()
-		err = qontakService.SendMessage(serviceData, MessageTypeConfirmed)
-		if err != nil {
-			fmt.Printf("failed to send message: %v\n", err)
-		}
-	}
+	fmt.Println(serviceData)
+	// appEnv := os.Getenv("ENV")
+	// if newStatus == string(models.Confirmed) && appEnv != "prod" {
+	// 	qontakService := NewQontakService()
+	// 	err = qontakService.SendMessage(serviceData, MessageTypeConfirmed)
+	// 	if err != nil {
+	// 		fmt.Printf("failed to send message: %v\n", err)
+	// 	}
+	// }
 
 	return newStatus, ticketId, err
 }

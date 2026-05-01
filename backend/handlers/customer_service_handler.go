@@ -54,7 +54,7 @@ func (h *CustomerServiceHandler) CreateServiceForm(c *gin.Context) {
 		ServiceType:    payload.ServiceType,
 		TechnicianName: payload.TechnicianName,
 	}
-	appEnv := os.Getenv("ENV")
+	// appEnv := os.Getenv("ENV")
 	qontakService := services.NewQontakService()
 
 	isValidPhoneNumber, err := qontakService.ValidatePhoneNumber(*service.PhoneNumber)
@@ -78,13 +78,13 @@ func (h *CustomerServiceHandler) CreateServiceForm(c *gin.Context) {
 		_ = c.Error(err)
 		return
 	}
-
-	if appEnv != "prod" {
-		if err := qontakService.SendMessage(createdService, services.MessageTypeConfirmation); err != nil {
-			_ = c.Error(err)
-			return
-		}
-	}
+	fmt.Println(createdService)
+	// if appEnv != "prod" {
+	// 	if err := qontakService.SendMessage(createdService, services.MessageTypeConfirmation); err != nil {
+	// 		_ = c.Error(err)
+	// 		return
+	// 	}
+	// }
 
 	successResponse = dto.GlobalResponseSuccess{
 		Success:    true,
