@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   # 1. Vector DB
   qdrant:
@@ -28,17 +27,27 @@ services:
       - "6379:6379"
 
   # 4. Database
-  postgres:
-    image: postgres:15-alpine
+  db:
+    image: postgres:14-alpine
+    container_name: db-landing
+    restart: always
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password123
-      POSTGRES_DB: agent_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: landing_page
     volumes:
-      - ./postgres_data:/var/lib/postgresql/data
-  
+      - pgdata_landing:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - landing_internal
+
   # 5. Database GUI (pgAdmin)
   pgadmin:
     image: dpage/pgadmin4
@@ -49,3 +58,69 @@ services:
       PGADMIN_DEFAULT_PASSWORD: password123
     depends_on:
       - postgres
+
+  backend:
+    build: ./backend
+    container_name: be-landing
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: root
+      DB_NAME: landing_page
+      ADMIN_PASSWORD: Zyr3xp@55word
+      API_KEY: ${API_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      ENV: ${ENV}
+      QONTAK_CHANNEL_INTEGRATION_ID: ${QONTAK_CHANNEL_INTEGRATION_ID}
+      QONTAK_API_TOKEN: ${QONTAK_API_TOKEN}
+      CRON_SECRET: ${CRON_SECRET}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_HOST}
+      SMTP_USERNAME: ${SMTP_HOST}
+      SMTP_PASSWORD: ${SMTP_HOST}
+      SMTP_FROM: ${SMTP_HOST}
+      SMTP_FROM_NAME: ${SMTP_HOST}
+      SMTP_DOMAIN: ${SMTP_HOST}
+      SMTP_RECIPIENTS: ${SMTP_RECIPIENTS}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - landing_internal
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY}
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${NEXT_PUBLIC_FIREBASE_PROJECT_ID}
+        NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}
+        NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}
+        NEXT_PUBLIC_FIREBASE_APP_ID: ${NEXT_PUBLIC_FIREBASE_APP_ID}
+        NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: ${NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID}
+    container_name: fe-landing
+    restart: always
+    ports:
+      - "4000:3000"
+    environment:
+      NNEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      API_URL: ${API_URL}
+      API_KEY: ${API_KEY}
+    depends_on:
+      - backend
+    networks:
+      - landing_internal
+
+volumes:
+  pgdata_landing:
+
+networks:
+  landing_internal:
+    driver: bridge

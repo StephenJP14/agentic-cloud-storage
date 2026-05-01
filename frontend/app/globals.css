@@ -1,0 +1,211 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fff;
+  --foreground: #424242;
+  --z-red: #A41E22;
+  --z-red-dark: #8b171b;
+  --z-red-light: #dc2127;
+  --z-gradient-1: linear-gradient(to right, #fdf1ae, #FFBD3C);
+}
+
+/* 
+* {
+  outline: 1px dashed green;
+} */
+
+input:focus {
+  outline: none;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-poppins), sans-serif;
+}
+
+table,
+th {
+  font-weight: 400;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+  border: 2px solid #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
+
+/* Class Custom */
+.thin-scrollbar {
+  /* Untuk Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+  /* warna thumb, warna track */
+}
+
+/* Untuk Chrome, Safari, dan Edge */
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  /* Lebar vertical scrollbar */
+  height: 6px;
+  /* Tinggi horizontal scrollbar */
+}
+
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  /* Latar belakang scrollbar */
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  /* Warna batang scrollbar */
+  border-radius: 20px;
+  /* Membuat scrollbar bulat */
+  border: transparent;
+  /* Ruang di sekitar batang */
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
+  /* Warna saat di-hover */
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 80s linear infinite;
+}
+
+@keyframes pulse-opacity {
+  0% {
+    opacity: 0.6;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.6;
+  }
+}
+
+.animate-pulse-opacity {
+  animation: pulse-opacity 3.2s ease-in-out infinite;
+}
+
+@keyframes flicker-opacity {
+  0% {
+    opacity: 1;
+  }
+
+  5% {
+    opacity: 0.3;
+  }
+
+  10% {
+    opacity: 0.9;
+  }
+
+  15% {
+    opacity: 0.4;
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  25% {
+    opacity: 0.2;
+  }
+
+  30% {
+    opacity: 0.8;
+  }
+
+  35% {
+    opacity: 0.1;
+  }
+
+  40% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+
+  60% {
+    opacity: 0.9;
+  }
+
+  70% {
+    opacity: 0.3;
+  }
+
+  80% {
+    opacity: 1;
+  }
+
+  90% {
+    opacity: 0.6;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+.animate-flicker {
+  animation: flicker-opacity 2.5s infinite;
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+}
