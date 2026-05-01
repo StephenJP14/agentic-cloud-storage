@@ -143,7 +143,7 @@ func (r *customerServiceRepository) GetAllServiceForms(limit, page int, status *
 				OR cs.ro_support ILIKE ?
 				OR cs.address ILIKE ?
 				OR cs.complaints ILIKE ?
-				OR cs.location ILIKE ?
+				OR cs.address ILIKE ?
 				OR cs.solution ILIKE ?
 			)
 		`)
