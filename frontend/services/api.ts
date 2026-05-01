@@ -4,7 +4,7 @@ import { signout } from './auth';
 const IS_SERVER = typeof window === 'undefined';
 const baseURL = IS_SERVER
     ? (process.env.API_URL || "http://backend:8080")
-    : (process.env.NEXT_PUBLIC_API_URL || "https://api.zyrex.com");
+    : (process.env.NEXT_PUBLIC_API_URL || "https://localhost:3000");
 
 const apiClient = axios.create({
     baseURL: baseURL,

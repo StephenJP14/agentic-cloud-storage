@@ -8,7 +8,7 @@ import (
 	"gitlab.com/zyrex1/landing-page/routes"
 	"gitlab.com/zyrex1/landing-page/services"
 	"log"
-	"os"
+	// "os"
 )
 
 func main() {
@@ -16,7 +16,7 @@ func main() {
 	// r.Use(gin.Recovery()) // <-- biar panic tetap ditangani
 
 	r.RedirectTrailingSlash = false
-	appEnv := os.Getenv("ENV")
+	// appEnv := os.Getenv("ENV")
 
 	corsConfig := cors.Config{
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -25,21 +25,23 @@ func main() {
 		AllowCredentials: true,
 	}
 
-	if appEnv == "prod" {
-		corsConfig.AllowOrigins = []string{
-			"https://zyrex.com",
-			"https://www.zyrex.com",
-		}
-	} else {
-		corsConfig.AllowOrigins = []string{
-			"http://localhost:3000",
-			"http://localhost:3001",
-			"http://127.0.0.1:3000",
-			"http://192.168.1.10:3000",
-			"http://192.168.1.10:4000",
-			"http://192.168.1.10:3001",
-		}
+	corsConfig.AllowOrigins = []string{
+		"http://localhost:3000",
 	}
+	// if appEnv == "prod" {
+	// 	corsConfig.AllowOrigins = []string{
+	// 		"https://zyrex.com",
+	// 		"https://www.zyrex.com",
+	// 	}
+	// } else {
+	// 	corsConfig.AllowOrigins = []string{
+	// 		"http://localhost:3001",
+	// 		"http://127.0.0.1:3000",
+	// 		"http://192.168.1.10:3000",
+	// 		"http://192.168.1.10:4000",
+	// 		"http://192.168.1.10:3001",
+	// 	}
+	// }
 
 	r.Use(cors.New(corsConfig))
 

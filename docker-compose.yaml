@@ -71,7 +71,7 @@ services:
       DB_USER: postgres
       DB_PASSWORD: root
       DB_NAME: landing_page
-      ADMIN_PASSWORD: Zyr3xp@55word
+      ADMIN_PASSWORD: 123
       API_KEY: ${API_KEY}
       JWT_SECRET: ${JWT_SECRET}
       ENV: ${ENV}
@@ -108,7 +108,7 @@ services:
     container_name: fe-landing
     restart: always
     ports:
-      - "4000:3000"
+      - "3000:3000"
     environment:
       NNEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       API_URL: ${API_URL}
