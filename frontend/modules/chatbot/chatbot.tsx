@@ -41,30 +41,52 @@ export default function Chatbot() {
             if (!response.body) return;
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
-            let accumulated = "";
+            // 1. Move accumulated into the loop (or better, use the previous state)
+            let currentContent = "";
 
             while (true) {
                 const { value, done } = await reader.read();
                 if (done) break;
 
-                const chunk = decoder.decode(value);
+                const chunk = decoder.decode(value, { stream: true });
                 const lines = chunk.split("\n");
 
                 for (const line of lines) {
-                    if (line.startsWith("data: ")) {
+                    if (!line.trim() || !line.startsWith("data: ")) continue;
+
+                    try {
                         const data = JSON.parse(line.slice(6));
-                        setMessages((prev) => {
-                            const updated = [...prev];
-                            const last = updated[updated.length - 1];
-                            if (data.status) last.status = data.status;
-                            if (data.token) {
-                                accumulated += data.token;
-                                last.content = accumulated;
-                                last.status = undefined;
-                            }
-                            if (data.done) setIsTyping(false);
-                            return updated;
-                        });
+
+                        if (data.token) {
+                            currentContent += data.token; // Keep a local track of the string
+
+                            setMessages((prev) => {
+                                const updated = [...prev];
+                                const lastIndex = updated.length - 1;
+
+                                // Create a NEW object for the last message instead of mutating
+                                updated[lastIndex] = {
+                                    ...updated[lastIndex],
+                                    content: currentContent,
+                                    status: undefined
+                                };
+
+                                return updated;
+                            });
+                        }
+
+                        if (data.status) {
+                            setMessages((prev) => {
+                                const updated = [...prev];
+                                const lastIndex = updated.length - 1;
+                                updated[lastIndex] = { ...updated[lastIndex], status: data.status };
+                                return updated;
+                            });
+                        }
+
+                        if (data.done) setIsTyping(false);
+                    } catch (e) {
+                        console.error("Error parsing stream line", e);
                     }
                 }
             }
