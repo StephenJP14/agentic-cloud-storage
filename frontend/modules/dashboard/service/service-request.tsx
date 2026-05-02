@@ -236,7 +236,7 @@ export default function ServiceRequest() {
 
     const handleAddPart = () => {
         const newPart: ServiceParts = {
-            ID: 0, // 0 menandakan data baru untuk backend
+            ID: 0, // 0 menandakan data baru untuk backend-go
             ticket_id: resources.selectedService?.ticket_id || "",
             part_name: "",
             quantity: 1,

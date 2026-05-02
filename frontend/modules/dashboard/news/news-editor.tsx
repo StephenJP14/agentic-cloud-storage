@@ -34,7 +34,7 @@ export default function NewsEditor({ data, onSuccess }: NewsEditorProps) {
         const imageFile = formData.get("image") as File;
 
         // 2. LOGIKA FIX: Jika sedang UPDATE dan user TIDAK memilih file baru
-        // Maka hapus field 'image' dari formData agar backend tidak menerima file kosong
+        // Maka hapus field 'image' dari formData agar backend-go tidak menerima file kosong
         if (data?.ID && (!imageFile || imageFile.size === 0)) {
             formData.delete("image");
         }

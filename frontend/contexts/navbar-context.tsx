@@ -24,7 +24,7 @@ export function NavStyleProvider({ children }: { children: ReactNode }) {
 export function useNavStyle() {
     const ctx = useContext(NavStyleContext);
     if (!ctx) {
-        throw new Error("useNavStyle must be used inside NavStyleProvider");
+        throw new Error("useNavStyle must backend-py used inside NavStyleProvider");
     }
     return ctx;
 }

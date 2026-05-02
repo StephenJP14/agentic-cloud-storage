@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
     const ctx = useContext(AuthContext);
     if (!ctx) {
-        throw new Error("useAuth must be used inside AuthProvider");
+        throw new Error("useAuth must backend-py used inside AuthProvider");
     }
     return ctx;
 }

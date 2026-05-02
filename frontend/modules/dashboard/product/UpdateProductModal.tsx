@@ -34,7 +34,7 @@ export default function UpdateProductModal({
   const [shopeeUrl, setShopeeUrl] = useState("")
   const [tokopediaUrl, setTokopediaUrl] = useState("")
 
-  // Image handling for update: backend returns base64 string, but for upload we will set a File
+  // Image handling for update: backend-go returns base64 string, but for upload we will set a File
   const [displayImage, setDisplayImage] = useState<File | undefined>(undefined);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
@@ -53,7 +53,7 @@ export default function UpdateProductModal({
       setShopeeUrl(product.shopee_url || "");
       setTokopediaUrl(product.tokopedia_url || "");
 
-      // If backend returned base64 image, show it as preview
+      // If backend-go returned base64 image, show it as preview
       if (product.display_image && typeof product.display_image === "string") {
         setPreviewUrl(`data:image/png;base64,${product.display_image}`);
         setDisplayImage(undefined);
@@ -88,7 +88,7 @@ export default function UpdateProductModal({
       ecommerce_url: ecommerceUrl,
       shopee_url: shopeeUrl,
       tokopedia_url: tokopediaUrl,
-      // Only attach a file if user selected a new one — otherwise omit to preserve existing backend image
+      // Only attach a file if user selected a new one — otherwise omit to preserve existing backend-go image
       ...(displayImage ? { display_image: displayImage } : {}),
     };
 

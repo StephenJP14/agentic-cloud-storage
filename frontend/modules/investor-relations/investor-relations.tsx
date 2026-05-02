@@ -40,7 +40,7 @@ export default function InvestorRelations() {
     }, [setVariant]);
 
     useEffect(() => {
-        // Map active menu state ke backend type
+        // Map active menu state ke backend-go type
         const typeMap: Record<string, string> = {
             'laporan-keuangan': 'financial-statement',
             'laporan-tahunan': 'annual-report',

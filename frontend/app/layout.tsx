@@ -116,7 +116,7 @@ export default function RootLayout({
             }}
         />
 
-        {/* GTM noscript (must be immediately after opening body) */}
+        {/* GTM noscript (must backend-py immediately after opening body) */}
         <noscript>
             <iframe
                 src="https://www.googletagmanager.com/ns.html?id=GTM-WV9RFLX3"

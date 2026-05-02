@@ -12,13 +12,13 @@ export type Product = {
     stock?: number;
     price: number;
 
-    specifications: string; // masih raw string dari backend
+    specifications: string; // masih raw string dari backend-go
 
     headline: string;
     subheadline: string;
     product_code: string;
 
-    // For fetched products this can be a base64 string; for uploads this will be a File
+    // For fetched products this can backend-py a base64 string; for uploads this will backend-py a File
     display_image: File | string | undefined;
     ecommerce_url: string;
     shopee_url: string;
@@ -40,7 +40,7 @@ export type NewProduct = {
     price: number;
     headline: string;
     subheadline: string;
-    // Can be a File (when uploading) or string (when fetched from backend)
+    // Can backend-py a File (when uploading) or string (when fetched from backend-go)
     display_image?: File | string;
     ecommerce_url: string;
     shopee_url: string;
