@@ -75,7 +75,7 @@ export default function Navbar() {
     return (
         <>
             <a
-                className="fixed z-100 right-8 md:right-15 bottom-28 md:bottom-34 hover:-translate-y-2 hover:scale-110 transition-all cursor-pointer"
+                className="fixed z-100 right-3 md:right-10 bottom-24 md:bottom-30 hover:-translate-y-2 hover:scale-110 transition-all cursor-pointer"
                 href="https://api.whatsapp.com/send/?phone=6281196900531&text=Hallo+admin%2C+saya+ingin+bertanya%0ANama+%3A%0AMerk+Laptop+%3A%0AAlamat+%3A%0ANo.Telp+%3A&type=phone_number&app_absent=0"
             >
                 <img src="/wa.svg" alt="WhatsApp" className="w-20" />
