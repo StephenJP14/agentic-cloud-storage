@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { FiMessageSquare, FiX, FiSend } from "react-icons/fi";
+import { FiX, FiSend } from "react-icons/fi";
+import { IoChatboxEllipses } from "react-icons/io5";
 
 interface Message {
     role: "user" | "bot";
@@ -45,7 +46,7 @@ export default function Chatbot() {
             while (true) {
                 const { value, done } = await reader.read();
                 if (done) break;
-                
+
                 const chunk = decoder.decode(value);
                 const lines = chunk.split("\n");
 
@@ -73,7 +74,7 @@ export default function Chatbot() {
     };
 
     return (
-        <div className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end">
+        <div className="fixed right-8 md:right-15 bottom-28 md:bottom-34 z-[9999] flex flex-col items-end">
             {/* Window Chat */}
             {isOpen && (
                 <div className="mb-4 w-80 sm:w-96 h-[450px] bg-white rounded-2xl shadow-xl flex flex-col border border-gray-100 overflow-hidden transition-all duration-300">
@@ -92,11 +93,10 @@ export default function Chatbot() {
                         )}
                         {messages.map((msg, i) => (
                             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                                    msg.role === 'user' 
-                                    ? 'bg-red-600 text-white rounded-br-none' 
+                                <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${msg.role === 'user'
+                                    ? 'bg-(--z-red) text-white rounded-br-none'
                                     : 'bg-gray-100 text-gray-700 rounded-bl-none'
-                                }`}>
+                                    }`}>
                                     {msg.status && <span className="text-[10px] block opacity-70 animate-pulse">{msg.status}</span>}
                                     {msg.content}
                                 </div>
@@ -113,10 +113,10 @@ export default function Chatbot() {
                             placeholder="Type a message..."
                             className="flex-1 text-sm outline-none bg-transparent"
                         />
-                        <button 
+                        <button
                             onClick={handleSendMessage}
                             disabled={isTyping}
-                            className={`p-2 transition-colors ${input ? 'text-red-600' : 'text-gray-300'}`}
+                            className={`p-2 transition-colors ${input ? 'text-(--z-red)' : 'text-gray-300'}`}
                         >
                             <FiSend size={18} />
                         </button>
@@ -127,9 +127,9 @@ export default function Chatbot() {
             {/* Toggle Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-12 h-12 bg-red-600 text-white rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-transform active:scale-95"
+                className="w-16 h-16 bg-(--z-red) text-white rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-transform active:scale-95"
             >
-                {isOpen ? <FiX size={20} /> : <FiMessageSquare size={20} />}
+                {isOpen ? <FiX size={24} /> : <IoChatboxEllipses size={32} />}
             </button>
         </div>
     );
