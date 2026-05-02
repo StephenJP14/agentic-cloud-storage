@@ -59,9 +59,22 @@ services:
     depends_on:
       - db
 
-  backend:
+  backend-py:
+    build: backend-py
+    container_name: backend-py
+    volumes:
+      - ./backend-py:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    networks:
+      - landing_internal
+
+  backend-go:
     build: backend-go
-    container_name: backend-py-landing
+    container_name: backend-go
     restart: always
     ports:
       - "8080:8080"
@@ -110,11 +123,11 @@ services:
     ports:
       - "3000:3000"
     environment:
-      NNEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       API_URL: ${API_URL}
       API_KEY: ${API_KEY}
     depends_on:
-      - backend
+      - backend-go
     networks:
       - landing_internal
 

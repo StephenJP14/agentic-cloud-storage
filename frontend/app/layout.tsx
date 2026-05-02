@@ -1,12 +1,13 @@
 import Navbar from "@/components/shared/navbar"
 import "./globals.css"
-import type {Metadata} from "next"
-import {Poppins} from "next/font/google"
-import {NavStyleProvider} from "@/contexts/navbar-context"
+import type { Metadata } from "next"
+import { Poppins } from "next/font/google"
+import { NavStyleProvider } from "@/contexts/navbar-context"
 import Footer from "@/components/shared/footer"
-import {Toaster} from 'react-hot-toast';
-import {AuthProvider} from "@/contexts/auth-context"
+import { Toaster } from 'react-hot-toast';
+import { AuthProvider } from "@/contexts/auth-context"
 import Script from "next/script"
+import Chatbot from "@/modules/chatbot/chatbot"
 
 const poppins = Poppins({
     subsets: ["latin"],
@@ -42,7 +43,7 @@ export const metadata: Metadata = {
         "Zyrex Laptop Harga",
     ],
 
-    authors: [{name: "Zyrex Indonesia"}],
+    authors: [{ name: "Zyrex Indonesia" }],
     creator: "Zyrex Indonesia",
     publisher: "Zyrex Indonesia",
 
@@ -93,47 +94,47 @@ export const metadata: Metadata = {
 
 
 export default function RootLayout({
-                                       children,
-                                   }: {
+    children,
+}: {
     children: React.ReactNode
 }) {
     return (
         <html lang="id">
-        <body className={`${poppins.variable} antialiased`}>
-
-        {/* Google Tag Manager */}
-        <Script
-            id="gtm-script"
-            strategy="afterInteractive"
-            dangerouslySetInnerHTML={{
-                __html: `
+            <body className={`${poppins.variable} antialiased`}>
+                <Chatbot />
+                {/* Google Tag Manager */}
+                <Script
+                    id="gtm-script"
+                    strategy="afterInteractive"
+                    dangerouslySetInnerHTML={{
+                        __html: `
           (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
           new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
           j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
           'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
           })(window,document,'script','dataLayer','GTM-WV9RFLX3');
         `,
-            }}
-        />
+                    }}
+                />
 
-        {/* GTM noscript (must backend-py immediately after opening body) */}
-        <noscript>
-            <iframe
-                src="https://www.googletagmanager.com/ns.html?id=GTM-WV9RFLX3"
-                height="0"
-                width="0"
-                style={{display: "none", visibility: "hidden"}}
-            />
-        </noscript>
-        <AuthProvider>
-            <NavStyleProvider>
-                <Navbar/>
-                {children}
-                <Toaster position="top-center" reverseOrder={false}/>
-                <Footer/>
-            </NavStyleProvider>
-        </AuthProvider>
-        </body>
+                {/* GTM noscript (must backend-py immediately after opening body) */}
+                <noscript>
+                    <iframe
+                        src="https://www.googletagmanager.com/ns.html?id=GTM-WV9RFLX3"
+                        height="0"
+                        width="0"
+                        style={{ display: "none", visibility: "hidden" }}
+                    />
+                </noscript>
+                <AuthProvider>
+                    <NavStyleProvider>
+                        <Navbar />
+                        {children}
+                        <Toaster position="top-center" reverseOrder={false} />
+                        <Footer />
+                    </NavStyleProvider>
+                </AuthProvider>
+            </body>
         </html>
     )
 }
