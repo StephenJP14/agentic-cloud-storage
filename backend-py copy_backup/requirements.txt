@@ -1,0 +1,30 @@
+# --- Web Server ---
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+python-dotenv
+
+# --- Databases & Persistence ---
+sqlalchemy           # Required for your Session/Depends(get_db) logic
+psycopg2-binary      # Postgres driver
+minio                # Object storage (MinIO)
+redis                # Caching/Session storage
+qdrant-client        # Vector database
+
+# --- AI & Orchestration ---
+langchain            # Core framework
+langchain-ollama     # Local LLM/Embedding support
+langgraph            # Agentic state machine logic
+pymupdf              # PDF parsing (used for file processing)
+langchain-text-splitters # Needed to chunk text before Qdrant storage
+langchain-community
+langchain-qdrant
+langgraph-checkpoint-redis
+FlagEmbedding
+transformers>=4.45   # AutoTokenizer + AutoModelForImageTextToText
+docling              # Semantic document conversion & chunking
+flashrank            # Cross-encoder reranking
+
+# --- Utilities ---
+httpx                # Required for async API calls within FastAPI
