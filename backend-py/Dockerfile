@@ -6,6 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1
 # Ensure stdout/stderr are unbuffered
 ENV PYTHONUNBUFFERED=1
 
+RUN apt-get update && apt-get install -y gcc zlib1g-dev
+
 # Set working directory
 WORKDIR /app
 
