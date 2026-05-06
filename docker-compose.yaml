@@ -6,6 +6,8 @@ services:
       - "6333:6333"
     volumes:
       - ./qdrant_data:/qdrant/storage
+    networks:
+      - landing_internal
 
   # 2. Object Storage (MinIO)
   minio:
@@ -19,6 +21,8 @@ services:
     command: server /data --console-address ":9001"
     volumes:
       - ./minio_data:/data
+    networks:
+      - landing_internal
 
   # 3. Cache/Memory
   redis:
@@ -68,7 +72,12 @@ services:
       - "8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
+      - QDRANT_HOST=qdrant  # Nama service Qdrant di compose ini
+      - QDRANT_PORT=6333
     restart: unless-stopped
+    depends_on:
+      - qdrant
+      - minio
     networks:
       - landing_internal
 
