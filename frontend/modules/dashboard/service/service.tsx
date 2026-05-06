@@ -7,8 +7,9 @@ import ServiceSettings from "./settings";
 import CreateRequest from "./create-request";
 import ServiceDocuments from "./service-documents";
 import BookingService from "./booking-service";
+import ServiceFiles from "./service-files";
 
-type TabMenu = 'data' | 'data-booking' | 'create-request' | 'service-center' | 'scan' | 'settings' | 'documents';
+type TabMenu = 'data' | 'data-booking' | 'create-request' | 'service-center' | 'scan' | 'settings' | 'documents' | 'files';
 
 export default function ServiceDashboard() {
     const { user } = useAuth();
@@ -17,7 +18,7 @@ export default function ServiceDashboard() {
     const getTabFromURL = useCallback((): TabMenu => {
         const params = new URLSearchParams(window.location.search);
         const tab = params.get('tab') as TabMenu;
-        const validTabs: TabMenu[] = ['data', 'create-request', 'service-center', 'scan', 'settings', 'documents', 'data-booking'];
+        const validTabs: TabMenu[] = ['data', 'create-request', 'service-center', 'scan', 'settings', 'documents', 'data-booking', 'files'];
 
         return validTabs.includes(tab) ? tab : 'create-request';
     }, []);
@@ -75,6 +76,9 @@ export default function ServiceDashboard() {
                         <button onClick={() => setActiveMenu('settings')} className={getBtnClass('settings')}>
                             Settings
                         </button>
+                        <button onClick={() => setActiveMenu('files')} className={getBtnClass('files')}>
+                            Files
+                        </button>
                     </>
                 )}
             </div>
@@ -87,6 +91,7 @@ export default function ServiceDashboard() {
                 {activeMenu === 'documents' && <ServiceDocuments />}
                 {activeMenu === 'scan' && <Scanner />}
                 {activeMenu === 'settings' && <ServiceSettings />}
+                {activeMenu === 'files' && <ServiceFiles />}
             </section>
         </>
     );
