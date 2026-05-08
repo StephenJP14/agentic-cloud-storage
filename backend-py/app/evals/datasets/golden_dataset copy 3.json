@@ -1,0 +1,157 @@
+[
+    {
+        "question": "Bagaimana cara pasang remote control Bluetooth ke TV Google TV ini?",
+        "ground_truth": "Tekan dan tahan tombol 'HOME' dan 'Kiri' secara bersamaan selama 5 detik, lalu tekan tombol 'OK' ketika 'TV_BLE_Remote' muncul di sudut kanan atas layar.",
+        "reference_source": "Manual Book - Google TV 100 inch.pdf"
+    },
+    {
+        "question": "Kalau TV LED saya rusak setelah 2 tahun, apakah masih bisa diperbaiki?",
+        "ground_truth": "Ya, TV LED masih bisa diperbaiki selama dalam masa jaminan 2 tahun, dengan syarat menggunakan jasa perbaikan dan suku cadang asli.",
+        "reference_source": "Manual Book - Google TV 100 inch.pdf"
+    },
+    {
+        "question": "Apa yang harus saya lakukan jika ingin membersihkan TV Google TV saya?",
+        "ground_truth": "Cabut steker TV, lalu gunakan kain lembut tanpa air dan tanpa bahan kimia untuk membersihkannya.",
+        "reference_source": "Manual Book - Google TV 100 inch.pdf"
+    },
+    {
+        "question": "Apa fungsi tombol 'Daya' di Google TV ini?",
+        "ground_truth": "Tekan tombol 'Daya' untuk menghidupkan atau mematikan TV. Ketika TV Anda mati, daya masih mengalir melaluinya. Untuk memutus daya sepenuhnya, cabut kabel daya.",
+        "reference_source": "Manual Book - Google TV 100 inch.pdf"
+    },
+    {
+        "question": "Kalau remote TV saya gak bisa dipasang, harus gimana ya?",
+        "ground_truth": "Coba tekan dan tahan tombol pairing di remote sampai LED TV berkedip, lalu lepaskan. Tunggu sampai info remote muncul di layar kanan. Jika gagal, tunggu 30 detik lalu ulangi langkah 1-3.",
+        "reference_source": "Manual Book - Google TV 100 inch.pdf"
+    },
+    {
+        "question": "Kenapa gambar di TV saya sering muncul bersalju dan ada noise?",
+        "ground_truth": "Periksa sambungan antenanya, karena masalah tersebut bisa disebabkan oleh koneksi antena yang tidak stabil atau rusak.",
+        "reference_source": "Manual Book - Google TV 100 inch.pdf"
+    },
+    {
+        "question": "Kenapa gambar TV saya tiba-tiba jadi ganda atau ada bayangan?",
+        "ground_truth": "Hal ini mungkin disebabkan oleh terhalangnya antena karena gedung bertingkat atau bukit. Menggunakan antena yang sangat terarah dapat meningkatkan gambar.",
+        "reference_source": "Manual Book - Google TV 100 inch.pdf"
+    },
+    {
+        "question": "Bagaimana cara mengatur waktu agar TV mati otomatis setelah menonton?",
+        "ground_truth": "Tekan tombol untuk pilih opsi, lalu tekan tombol OK untuk masuk ke sub-menu. Pilih opsi 'Tidak Ada Sinyal Mati Otomatis' dan pilih durasi yang diinginkan (5 menit, 10 menit, 15 menit, 30 menit, atau 60 menit).",
+        "reference_source": "Manual Book - Google TV 100 inch.pdf"
+    },
+    {
+        "question": "Bagaimana cara mematikan fitur screen saver di Google TV 100 inch?",
+        "ground_truth": "Tekan tombol untuk memilih opsi 'Penyimpanan', lalu tekan tombol OK untuk masuk ke sub-menu. Pilih 'Kapan Memulai', lalu pilih opsi 'Tidak pernah' atau matikan fitur screen saver dengan menonaktifkan opsi 'Mulai sekarang' dan simpan perubahan dengan tekan tombol KEMBALI.",
+        "reference_source": "Manual Book - Google TV 100 inch.pdf"
+    },
+    {
+        "question": "Bolehkah saya letakkan TV di atas pemutar kaset atau lampu pemanas?",
+        "ground_truth": "Tidak boleh. Jangan letakkan unit penerima televisi di atas produk lain yang mengeluarkan panas, seperti pemutar kaset atau lampu pemanas, karena bisa mengurangi masa pakai TV dan berbahaya.",
+        "reference_source": "Manual Book - Google TV 100 inch.pdf"
+    },
+    {
+        "question": "Apa yang harus saya lakukan jika TV saya tiba-tiba tidak bisa dinyalakan?",
+        "ground_truth": "Cabut peralatan ini selama badai pencahayaan atau ketika tidak digunakan dalam jangka waktu yang lama. Jika TV tidak beroperasi secara normal, serahkan servis kepada petugas servis yang berkualifikasi.",
+        "reference_source": "Manual Book - Google TV 85 inch.pdf"
+    },
+    {
+        "question": "Kalau remote TV saya gak bisa dipasang, apa yang harus saya lakukan?",
+        "ground_truth": "Coba tekan dan tahan tombol pairing di remote hingga LED di TV berkedip, lalu lepaskan. Tunggu hingga muncul informasi remote di layar kanan. Jika gagal, tunggu 30 detik lalu ulangi langkah 1-3.",
+        "reference_source": "Manual Book - Google TV 85 inch.pdf"
+    },
+    {
+        "question": "Bagaimana cara mengatur waktu agar layar TV mati otomatis setelah saya tidak menonton?",
+        "ground_truth": "Tekan tombol untuk pilih opsi, lalu tekan tombol OK untuk masuk ke sub-menu. Pilih opsi yang diinginkan seperti 5 menit, 10 menit, 15 menit, 30 menit, atau 60 menit.",
+        "reference_source": "Manual Book - Google TV 85 inch.pdf"
+    },
+    {
+        "question": "Bolehkah saya letakkan TV di atas pemutar kaset atau lampu pemanas?",
+        "ground_truth": "Tidak boleh. Jangan letakkan unit penerima televisi di atas produk lain yang mengeluarkan panas, seperti pemutar kaset atau lampu pemanas, karena bisa mengurangi masa pakai TV dan berbahaya.",
+        "reference_source": "Manual Book - Google TV 85 inch.pdf"
+    },
+    {
+        "question": "Bagaimana cara mengatur tanggal dan waktu di Google TV 85 inch?",
+        "ground_truth": "Tekan tombol untuk memilih opsi, lalu tekan tombol OK untuk masuk ke sub-menu. Setelah menyelesaikan penyesuaian, tekan tombol BACK untuk kembali ke menu sebelumnya.",
+        "reference_source": "Manual Book - Google TV 85 inch.pdf"
+    },
+    {
+        "question": "Bagaimana cara mematikan fitur Screen Saver di Google TV 85 inch?",
+        "ground_truth": "Tekan tombol untuk memilih opsi 'Penyimpanan', lalu tekan tombol OK untuk masuk ke sub-menu. Pilih 'Kapan Memulai', lalu pilih opsi 'Tidak pernah' atau matikan fitur tersebut dengan menekan tombol OK.",
+        "reference_source": "Manual Book - Google TV 85 inch.pdf"
+    },
+    {
+        "question": "Bagaimana cara pasang remote control Bluetooth ke TV Google TV 85 inch ini?",
+        "ground_truth": "Tekan dan tahan tombol 'HOME' dan 'Kiri' secara bersamaan selama 5 detik, lalu tekan tombol 'OK' ketika 'TV_BLE_Remote' muncul di sudut kanan atas layar.",
+        "reference_source": "Manual Book - Google TV 85 inch.pdf"
+    },
+    {
+        "question": "Bagaimana cara mematikan TV Google TV 85 inch secara benar agar tidak ada daya yang tersisa?",
+        "ground_truth": "Untuk mematikan TV secara benar dan memutus daya sepenuhnya, Anda perlu cabut kabel daya, bukan hanya menekan tombol Daya.",
+        "reference_source": "Manual Book - Google TV 85 inch.pdf"
+    },
+    {
+        "question": "Kenapa gambar di TV saya sering berisik dan berbintik-bintik seperti salju?",
+        "ground_truth": "Coba periksa koneksi antenanya, karena gejala ini bisa disebabkan oleh sambungan antena yang tidak stabil atau gangguan sinyal.",
+        "reference_source": "Manual Book - Google TV 85 inch.pdf"
+    },
+    {
+        "question": "Kalau TV LED-ku rusak setelah 2 tahun, apakah masih bisa diperbaiki?",
+        "ground_truth": "Ya, TV LED masih bisa diperbaiki selama dalam masa garansi 2 tahun, karena jaminan mencakup jasa perbaikan dan suku cadang asli untuk panel LCD/LED.",
+        "reference_source": "Manual Book - Google TV 85 inch.pdf"
+    },
+    {
+        "question": "Kalau laptop Zyrex Cruiser 20 saya terkena air, apa yang harus saya lakukan?",
+        "ground_truth": "Segera tutup perangkat dan jangan gunakan hingga kering, agar tidak terjadi kerusakan akibat kelembapan.",
+        "reference_source": "Manual Book - Cruiser 20 100 unit.pdf"
+    },
+    {
+        "question": "Bagaimana cara nyalakan laptop ini agar bisa dipakai?",
+        "ground_truth": "Tekan tombol Daya hingga layar menyala. Tunggu hingga layar Desktop muncul; laptop kini siap digunakan.",
+        "reference_source": "Manual Book - Cruiser 20 100 unit.pdf"
+    },
+    {
+        "question": "Apa yang harus saya lakukan untuk menginstal aplikasi baru di Windows?",
+        "ground_truth": "Klik ikon Windows Store pada bilah tugas bagian bawah, di sana Anda akan menemukan lebih dari 1 juta aplikasi, termasuk banyak yang gratis. Meskipun hanya menggunakan aplikasi gratis, Anda tetap perlu membuat akun Windows, tetapi tidak perlu memasukkan detail kartu kredit.",
+        "reference_source": "Manual Book - Cruiser 20 100 unit.pdf"
+    },
+    {
+        "question": "Bolehkah saya pakai Cruiser 22 di luar ruangan saat hujan?",
+        "ground_truth": "Tidak, perangkat ini harus dijauhkan dari hujan atau kelembapan. Jika terkena percikan air, segera matikan dan tunggu hingga benar-benar kering sebelum menyalakannya kembali.",
+        "reference_source": "Manual Book Cruiser 22 - Final.pdf"
+    },
+    {
+        "question": "Apa yang harus saya lakukan dengan baterai notebook kalau sudah tidak bisa dipakai lagi?",
+        "ground_truth": "Baterai tidak boleh dibuang bersama limbah rumah tangga. Konsultasikan peraturan setempat untuk pembuangan baterai.",
+        "reference_source": "Manual Book Cruiser 22 - Final.pdf"
+    },
+    {
+        "question": "Kalau mau nyalain laptopnya, caranya gimana ya?",
+        "ground_truth": "Menghidupkan perangkat Anda dengan menekan dan menahan tombol daya untuk waktu yang lama.",
+        "reference_source": "Manual Book Cruiser 22 - Final.pdf"
+    },
+    {
+        "question": "Bagaimana cara membuka aplikasi di Windows 11 menggunakan touchpad?",
+        "ground_truth": "Tekan sebentar sekali pada touchpad untuk melakukan klik kiri, lalu klik item aplikasi yang ingin dibuka.",
+        "reference_source": "Manual Book Cruiser 22 - Final.pdf"
+    },
+    {
+        "question": "Bagaimana cara nyalakan Wi-Fi di perangkatku?",
+        "ground_truth": "Klik ikon Wi-Fi di area notifikasi, lalu pilih jaringan nirkabel yang ingin Anda sambungkan. Jika Wi-Fi belum aktif, klik ikon untuk mengaktifkannya, pilih jaringan, dan klik 'Sambungkan'. Jika ada kunci keamanan, masukkan kunci tersebut sebelum menyambungkan.",
+        "reference_source": "Manual Book Cruiser 22 - Final.pdf"
+    },
+    {
+        "question": "Bagaimana cara nyalakan mode pesawat di perangkat ini?",
+        "ground_truth": "Klik ikon mode pesawat di area notifikasi, lalu klik tombol yang muncul untuk mengaktifkan mode pesawat.",
+        "reference_source": "Manual Book Cruiser 22 - Final.pdf"
+    },
+    {
+        "question": "Laptop Zyrex Cruiser 22 A82 saya tidak mau nyala, apa yang harus saya lakukan?",
+        "ground_truth": "Paksa perangkat mati dengan menekan tombol daya selama 10 detik dan kemudian lepaskan semua perangkat USB yang terhubung. Sambungkan perangkat ke stopkontak dengan pengisi daya. Nyalakan perangkat. Jika masalah masih berlanjut, hubungi Layanan Pelanggan.",
+        "reference_source": "Manual Book Cruiser 22 - Final.pdf"
+    },
+    {
+        "question": "Kalau mesin Cruiser 22 saya rusak karena petir, apakah Zyrex bisa ganti atau bayar kerusakannya?",
+        "ground_truth": "Zyrex tidak akan bertanggung jawab atas kerusakan yang disebabkan oleh lonjakan daya atau sambaran petir.",
+        "reference_source": "Manual Book Cruiser 22 - Final.pdf"
+    }
+]

@@ -2,6 +2,8 @@
 import { useState, useRef, useEffect } from "react";
 import { FiX, FiSend } from "react-icons/fi";
 import { IoChatboxEllipses } from "react-icons/io5";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface Message {
     role: "user" | "bot";
@@ -41,7 +43,6 @@ export default function Chatbot() {
             if (!response.body) return;
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
-            // 1. Move accumulated into the loop (or better, use the previous state)
             let currentContent = "";
 
             while (true) {
@@ -58,13 +59,12 @@ export default function Chatbot() {
                         const data = JSON.parse(line.slice(6));
 
                         if (data.token) {
-                            currentContent += data.token; // Keep a local track of the string
+                            currentContent += data.token;
 
                             setMessages((prev) => {
                                 const updated = [...prev];
                                 const lastIndex = updated.length - 1;
 
-                                // Create a NEW object for the last message instead of mutating
                                 updated[lastIndex] = {
                                     ...updated[lastIndex],
                                     content: currentContent,
@@ -115,12 +115,23 @@ export default function Chatbot() {
                         )}
                         {messages.map((msg, i) => (
                             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${msg.role === 'user'
+                                <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed overflow-x-auto ${msg.role === 'user'
                                     ? 'bg-(--z-red) text-white rounded-br-none'
                                     : 'bg-gray-100 text-gray-700 rounded-bl-none'
                                     }`}>
                                     {msg.status && <span className="text-[10px] block opacity-70 animate-pulse">{msg.status}</span>}
-                                    {msg.content}
+
+                                    {/* Markdown Rendering Logic */}
+                                    {/* Markdown Rendering Logic */}
+                                    {msg.role === 'bot' ? (
+                                        <div className="markdown-body space-y-2 [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>table]:w-full [&>table]:border-collapse [&_th]:border [&_th]:p-1 [&_td]:border [&_td]:p-1">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                {msg.content}
+                                            </ReactMarkdown>
+                                        </div>
+                                    ) : (
+                                        <span className="whitespace-pre-wrap">{msg.content}</span>
+                                    )}
                                 </div>
                             </div>
                         ))}

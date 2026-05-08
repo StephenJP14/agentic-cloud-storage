@@ -1,4 +1,4 @@
-# embed_model.py
+# services/embed_model.py
 # Shared lazy loader for BGEM3FlagModel
 
 from FlagEmbedding import BGEM3FlagModel

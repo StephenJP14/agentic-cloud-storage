@@ -1,3 +1,5 @@
+# services/agent.py
+
 import os
 import json
 from typing import TypedDict, Literal, Annotated
@@ -39,11 +41,14 @@ class RouteQuery(BaseModel):
     datasource: Literal["vectorstore", "chitchat", "summarize"] = Field(..., description="Route target")
     query_intent: str = Field(default="", description="The specific topic or document name to summarize")
 
+# ==========================================
+# Update Router Logic (in agent.py)
+# ==========================================
 router_prompt = ChatPromptTemplate.from_messages([
     ("system", """Berdasarkan pertanyaan user, tentukan routing:
-    - Jika butuh mencari fakta spesifik/menjawab pertanyaan teknis dari dokumen, pilih 'vectorstore'.
-    - Jika meminta ringkasan, kesimpulan, atau summary SELURUH dokumen/topik, pilih 'summarize' dan ekstrak topik/nama filenya.
-    - Jika sapaan biasa, pilih 'chitchat'."""),
+    - Jika butuh mencari panduan teknis, spesifikasi, troubleshooting, atau letak port/tombol dari buku manual, pilih 'vectorstore'.
+    - Jika meminta ringkasan produk atau keseluruhan panduan, pilih 'summarize' dan ekstrak nama perangkatnya.
+    - Jika sapaan biasa atau pertanyaan di luar konteks teknis, pilih 'chitchat'."""),
     ("human", "{question}"),
 ])
 router_chain = router_prompt | llm.with_structured_output(RouteQuery)
@@ -257,22 +262,22 @@ def grade_context_node(state: AgentState):
     return {"filtered_docs": filtered}
 
 # ==========================================
-# RAG Prompt Builder (used by main.py for both streaming & non-streaming)
+# RAG Prompt Builder (in agent.py)
 # ==========================================
 def build_rag_prompt(docs: list[Document], user_question: str) -> str:
     formatted_docs = "\n\n".join([
-        f"[NAMA FILE: {d.metadata.get('filename')}] [SUMBER: {d.metadata.get('source_type')}]\n{d.page_content}" 
+        f"[PERANGKAT: {d.metadata.get('product_category')}] [NAMA FILE: {d.metadata.get('filename')}]\n{d.page_content}" 
         for d in docs
     ])
-    return f"""Anda adalah asisten akademik Agentic AI. Jawab pertanyaan berdasarkan DOKUMEN di bawah.
+    return f"""Anda adalah Tech Support Assistant dari perusahaan IT Manufacture. Jawab pertanyaan pengguna berdasarkan BUKU MANUAL di bawah ini.
 ATURAN KRUSIAL:
-1. Jika terdapat kontradiksi antara sumber TEKS dan GAMBAR/DIAGRAM, sebutkan perbedaannya secara eksplisit.
-2. Jangan menebak. Gunakan HANYA informasi dari dokumen.
-3. Jawab dengan lengkap dan jelas dalam bahasa yang sesuai pertanyaan.
+1. Pandu pengguna langkah demi langkah jika mereka bertanya tentang troubleshooting atau cara penggunaan.
+2. Jika informasi mengharuskan pengguna melihat gambar (misalnya lokasi port/tombol), jelaskan posisinya secara detail berdasarkan tag [DESKRIPSI GAMBAR/DIAGRAM] di dokumen.
+3. Jangan menebak spesifikasi. Gunakan HANYA informasi dari dokumen.
 
 PERTANYAAN: "{user_question}"
 
-DOKUMEN:
+DOKUMEN MANUAL:
 {formatted_docs}
 """
 

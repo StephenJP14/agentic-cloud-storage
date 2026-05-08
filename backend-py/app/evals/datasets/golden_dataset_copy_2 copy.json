@@ -1,0 +1,32 @@
+[
+    {
+        "source_file": "Manual Book - Zyrex Ultra.pdf",
+        "question_type": "Procedural",
+        "question": "Gimana cara membersihkan laptop Zyrex Ultra yang kotor?",
+        "ground_truth": "Matikan sistem dan cabut adaptor sebelum membersihkan produk; seka kerangka produk dengan handuk basah dan keringkan dengan kain lembut."
+    },
+    {
+        "source_file": "Manual Book - Zyrex Ultra.pdf",
+        "question_type": "Troubleshooting",
+        "question": "Laptop Zyrex Ultra nggak nyala, apa yang harus saya cek dulu?",
+        "ground_truth": "Matikan laptop; pastikan adaptor daya AC tersambung ke laptop dan soket catu daya telah terisi daya; pastikan semua perangkat eksternal yang tersambung telah terkoneksi."
+    },
+    {
+        "source_file": "Manual Book - Zyrex Ultra.pdf",
+        "question_type": "Factual/Specs",
+        "question": "Berapa ukuran lebar halaman panduan Zyrex Ultra?",
+        "ground_truth": "Lebar halaman adalah 7.425 cm."
+    },
+    {
+        "source_file": "Manual Book - Zyrex Ultra.pdf",
+        "question_type": "Image-referencing",
+        "question": "Tombol daya Zyrex Ultra itu sebelah mana?",
+        "ground_truth": "Tombol daya terletak di pojok kanan atas perangkat."
+    },
+    {
+        "source_file": "Manual Book - Zyrex Ultra.pdf",
+        "question_type": "Negative",
+        "question": "Bisa nggak pakai baterai non-asli di Zyrex Ultra?",
+        "ground_truth": "Tidak, dilarang keras menggunakan baterai non-asli atau jenis baterai lainnya, karena bisa berisiko ledakan."
+    }
+]

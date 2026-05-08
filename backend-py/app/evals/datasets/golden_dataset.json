@@ -1,0 +1,152 @@
+[
+    {
+        "source_file": "Manual Book - Google TV 100 inch.pdf",
+        "question_type": "Procedural",
+        "question": "Gimana cara nyalain TV Zyrex ini kalau lagi mati total?",
+        "ground_truth": "Cabut kabel daya AC dari stopkontak AC, lalu tekan tombol daya TV atau tombol daya pada remote control untuk menghidupkan TV."
+    },
+    {
+        "source_file": "Manual Book - Google TV 100 inch.pdf",
+        "question_type": "Troubleshooting",
+        "question": "TV-ku tiba-tiba mati, lampunya merah, apa yang harus dilakukan?",
+        "ground_truth": "Jika TV dalam mode siaga (lampu menyala merah), tekan tombol daya TV atau tombol daya pada remote control untuk menghidupkan TV."
+    },
+    {
+        "source_file": "Manual Book - Google TV 100 inch.pdf",
+        "question_type": "Factual/Specs",
+        "question": "Apa saja port koneksi yang tersedia di belakang TV Zyrex ini?",
+        "ground_truth": "Port koneksi yang tersedia di belakang TV termasuk COAX, AUDIO IN, RF, HDMI 1, HDMI 2, HDMI 3, USB1, USB2, EARPHONE OUT."
+    },
+    {
+        "source_file": "Manual Book - Google TV 100 inch.pdf",
+        "question_type": "Image-referencing",
+        "question": "Tombol daya remote controlnya sebelah mana?",
+        "ground_truth": "Tombol daya terletak di bagian atas remote control, berada di sebelah kiri tombol daftar sumber input."
+    },
+    {
+        "source_file": "Manual Book - Google TV 100 inch.pdf",
+        "question_type": "Negative",
+        "question": "Bisa nggak ngejepit kabel daya di bagian bawah TV?",
+        "ground_truth": "Tidak boleh, kabel catu daya jangan sampai terjepit pada bagian bawah penerima televisi."
+    },
+    {
+        "source_file": "Manual Book - Google TV 85 inch.pdf",
+        "question_type": "Procedural",
+        "question": "Gimana cara nyalain TV Zyrex ini kalau lampunya merah?",
+        "ground_truth": "Tekan tombol daya TV atau tombol daya pada remote control untuk menghidupkan TV."
+    },
+    {
+        "source_file": "Manual Book - Google TV 85 inch.pdf",
+        "question_type": "Troubleshooting",
+        "question": "TV-ku tiba-tiba mati, apa yang harus dilakukan?",
+        "ground_truth": "Cabut kabel daya AC dari stopkontak AC, tunggu beberapa saat, lalu sambungkan kembali dan nyalakan TV."
+    },
+    {
+        "source_file": "Manual Book - Google TV 85 inch.pdf",
+        "question_type": "Factual/Specs",
+        "question": "Berapa jarak minimal yang harus dijaga antara TV dan peralatan lain yang mengeluarkan panas?",
+        "ground_truth": "Jarak minimal harus dijaga jika TV akan dipasang di dalam kompartemen atau penutup serupa untuk mencegah penumpukan panas."
+    },
+    {
+        "source_file": "Manual Book - Google TV 85 inch.pdf",
+        "question_type": "Image-referencing",
+        "question": "Tombol daya remote controlnya sebelah mana?",
+        "ground_truth": "Tombol daya terletak di bagian atas remote control, di sebelah kiri tombol daftar sumber input."
+    },
+    {
+        "source_file": "Manual Book - Google TV 85 inch.pdf",
+        "question_type": "Negative",
+        "question": "Bisa nggak pasang TV di atas meja yang tidak stabil?",
+        "ground_truth": "Tidak, jangan letakkan televisi di atas kereta dorong, dudukan, rak, atau meja yang tidak stabil karena bisa berbahaya."
+    },
+    {
+        "source_file": "Manual Book - Zyrex Ultra.pdf",
+        "question_type": "Procedural",
+        "question": "Gimana cara membersihkan laptop Zyrex Ultra yang kotor?",
+        "ground_truth": "Matikan sistem dan cabut adaptor sebelum membersihkan produk; seka kerangka produk dengan handuk basah dan keringkan dengan kain lembut."
+    },
+    {
+        "source_file": "Manual Book - Zyrex Ultra.pdf",
+        "question_type": "Troubleshooting",
+        "question": "Laptop Zyrex Ultra nggak nyala, apa yang harus dilakukan?",
+        "ground_truth": "Matikan laptop; pastikan adaptor daya AC tersambung ke laptop dan soket catu daya telah terisi daya; pastikan semua perangkat eksternal yang tersambung telah terkoneksi."
+    },
+    {
+        "source_file": "Manual Book - Zyrex Ultra.pdf",
+        "question_type": "Factual/Specs",
+        "question": "Ukuran dokumen panduan Zyrex Ultra berapa?",
+        "ground_truth": "Tinggi dokumen 10,5 cm dan lebar 7,425 cm."
+    },
+    {
+        "source_file": "Manual Book - Zyrex Ultra.pdf",
+        "question_type": "Image-referencing",
+        "question": "Tombol power-nya sebelah mana ya?",
+        "ground_truth": "Tombol power terletak di pojok kanan atas, terpisah dari susunan keyboard utama."
+    },
+    {
+        "source_file": "Manual Book - Zyrex Ultra.pdf",
+        "question_type": "Negative",
+        "question": "Bisa nggak pakai baterai non-asli di Zyrex Ultra?",
+        "ground_truth": "Dilarang keras menggunakan baterai non-asli atau jenis baterai lainnya, karena berisiko ledakan."
+    },
+    {
+        "source_file": "Manual Book - Cruiser 20 100 unit.pdf",
+        "question_type": "Procedural",
+        "question": "Gimana cara menyalakan laptop Zyrex Cruiser 20?",
+        "ground_truth": "Tekan tombol Daya hingga layar menyala. Tunggu hingga layar Desktop muncul; laptop kini siap digunakan."
+    },
+    {
+        "source_file": "Manual Book - Cruiser 20 100 unit.pdf",
+        "question_type": "Troubleshooting",
+        "question": "Laptop Zyrex Cruiser 20 nggak mau nyala, apa yang harus dilakukan?",
+        "ground_truth": "Pastikan tombol Daya ditekan dengan benar dan tidak ada benda yang menghalangi. Jika masih tidak menyala, cek kabel daya dan pastikan sumber daya tersedia."
+    },
+    {
+        "source_file": "Manual Book - Cruiser 20 100 unit.pdf",
+        "question_type": "Factual/Specs",
+        "question": "Kamera internal di Zyrex Cruiser 20 berapa resolusinya?",
+        "ground_truth": "Kamera internal memiliki resolusi 2MP."
+    },
+    {
+        "source_file": "Manual Book - Cruiser 20 100 unit.pdf",
+        "question_type": "Image-referencing",
+        "question": "Tombol daya di sebelah mana ya?",
+        "ground_truth": "Tombol daya terletak di pojok kanan atas tepat di atas keyboard, di posisi kanan atas."
+    },
+    {
+        "source_file": "Manual Book - Cruiser 20 100 unit.pdf",
+        "question_type": "Negative",
+        "question": "Bisa nggak pakai Zyrex Cruiser 20 di ruangan yang lembab?",
+        "ground_truth": "Tidak, jangan gunakan di lingkungan yang lembab karena bisa menyebabkan kerusakan akibat kelembapan."
+    },
+    {
+        "source_file": "Manual Book Cruiser 22 - Final.pdf",
+        "question_type": "Procedural",
+        "question": "Gimana cara nyalain laptop Zyrex Cruiser 22 ini?",
+        "ground_truth": "Tekan dan tahan tombol daya untuk waktu yang lama."
+    },
+    {
+        "source_file": "Manual Book Cruiser 22 - Final.pdf",
+        "question_type": "Troubleshooting",
+        "question": "Laptop gak mau nyala, apa yang bisa dilakuin?",
+        "ground_truth": "Pastikan baterai terisi daya, cek kabel daya, dan pastikan tidak ada kerusakan fisik pada port daya atau tombol daya."
+    },
+    {
+        "source_file": "Manual Book Cruiser 22 - Final.pdf",
+        "question_type": "Factual/Specs",
+        "question": "Suhu operasional laptop ini berapa?",
+        "ground_truth": "Suhu ambien harus antara 5°C hingga 35°C (41°F hingga 95°F)."
+    },
+    {
+        "source_file": "Manual Book Cruiser 22 - Final.pdf",
+        "question_type": "Image-referencing",
+        "question": "Tombol daya letaknya sebelah mana?",
+        "ground_truth": "Tombol daya terletak di bagian depan, tepat di atas keyboard, di posisi kanan atas."
+    },
+    {
+        "source_file": "Manual Book Cruiser 22 - Final.pdf",
+        "question_type": "Negative",
+        "question": "Bisa nggak dipakai di bawah hujan?",
+        "ground_truth": "Tidak, perangkat harus dijauhkan dari hujan atau kelembapan, karena paparan cairan bisa merusak perangkat."
+    }
+]

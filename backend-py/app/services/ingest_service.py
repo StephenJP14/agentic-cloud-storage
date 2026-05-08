@@ -1,19 +1,23 @@
+# services/ingest_service.py
+
 import os
 import base64
 import uuid
 import json
+from io import BytesIO
+from PIL import Image
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient, models
 from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage, SystemMessage
 from urllib.parse import quote
 
-# [ARCHITECT FIX] Replace naive chunking with Docling for Semantic Objects
-from docling.document_converter import DocumentConverter
+from docling.document_converter import DocumentConverter, PdfFormatOption
+from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling.chunking import HybridChunker
 
 from app.services.embed_model import get_embed_model
-from app.core.config import OLLAMA_URL, QDRANT_URL, REDIS_URL, COLLECTION_NAME, COLLECTION_SUMM
+from app.core.config import OLLAMA_URL, QDRANT_URL, COLLECTION_NAME, COLLECTION_SUMM
 
 load_dotenv()
 WINDOWS_IP = os.getenv("WINDOWS_IP", "127.0.0.1")
@@ -45,6 +49,31 @@ if not qdrant.collection_exists(collection_summ):
         }
     )
 
+
+def describe_image_with_qwen(pil_image: Image.Image) -> str:
+    """Passes an extracted image to Qwen3-VL to get a textual description."""
+    try:
+        # Convert PIL Image to Base64
+        buffered = BytesIO()
+        pil_image.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+        
+        prompt = """Kamu adalah asisten teknis. Jelaskan diagram, tabel, atau gambar dari buku manual ini secara detail. 
+        Sebutkan semua teks yang ada di dalam gambar, lokasi tombol/port jika ada, dan fungsi yang dijelaskan."""
+        
+        message = HumanMessage(
+            content=[
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": f"data:image/png;base64,{img_str}"}
+            ]
+        )
+        
+        print("👁️ [VISION] Menganalisis gambar dengan Qwen3-VL...")
+        response = local_llm.invoke([message])
+        return f"\n\n[DESKRIPSI GAMBAR/DIAGRAM]: {response.content.strip()}"
+    except Exception as e:
+        print(f"⚠️ Vision Error: {e}")
+        return ""
 
 # ==========================================
 # NEW: Dedicated Map-Reduce Summarization Function
@@ -130,10 +159,17 @@ def ingest_file(file_path, user_id="u_default"):
     filename = os.path.basename(file_path)
     safe_filename = quote(filename)
     
-    print(f"🔄 [PROCESS] Memulai ekstraksi Semantic Object: {filename}...")
+    # 1. Configure Docling to extract images
+    pipeline_options = PdfPipelineOptions()
+    pipeline_options.images_scale = 2.0
+    pipeline_options.generate_page_images = False
+    pipeline_options.generate_picture_images = True # CRITICAL: Enable picture extraction
+
+    converter = DocumentConverter(
+        format_options={"pdf": PdfFormatOption(pipeline_options=pipeline_options)}
+    )
     
-    # [ARCHITECT FIX] Strategy #7: Context-Aware Chunking via Docling
-    converter = DocumentConverter()
+    print(f"🔄 [PROCESS] Memulai ekstraksi Semantic Object & Gambar: {filename}...")
     docling_doc = converter.convert(file_path).document
     
 
@@ -181,40 +217,46 @@ def ingest_file(file_path, user_id="u_default"):
         ]
     )
     print(f"📤 [QDRANT] Full summary untuk {filename} berhasil diunggah ke '{collection_summ}'.")
-
-
+    
 
     # Generate a brief summary of the whole doc for enrichment
     full_text_preview = docling_doc.export_to_markdown()[:3000]
     doc_summary = local_llm.invoke([
-        SystemMessage(content="Summarize this academic document in 3 sentences."),
+        SystemMessage(content="Summarize this technical manual in 3 sentences."),
         HumanMessage(content=full_text_preview)
     ]).content
 
-    # Token-aware hybrid chunking respects document structure
-    # Reuse the tokenizer from the already-loaded BGE-M3 model
     chunker = HybridChunker(tokenizer=embed_model.tokenizer, max_tokens=800, merge_peers=True)
-    
     chunk_iter = chunker.chunk(dl_doc=docling_doc)
     
     points = []
     global_chunk_idx = 0
 
+    # Auto-tag product category based on filename for now (can be replaced by admin panel input later)
+    category = "Unknown"
+    if "TV" in filename.upper(): category = "TV"
+    elif "LAPTOP" in filename.upper() or "D-TECH" in filename.upper(): category = "Laptop"
+
     for chunk in chunk_iter:
         raw_text = chunk.text
         if not raw_text.strip(): continue
 
-        # [ARCHITECT FIX] Apply Contextual Enrichment
-        # [FIX 1: Apply Docling's native contextualization]
-        # This stitches the document headings back into the text
         try:
             docling_context_text = chunker.contextualize(chunk)
         except AttributeError:
-            # Fallback if your specific Docling version uses a different method
             docling_context_text = raw_text
 
-        # [FIX 2: Combine structural context with global LLM summary]
-        enriched_text = generate_contextual_prefix(docling_context_text, doc_summary, filename)
+        # 2. Check if this chunk contains any extracted images
+        image_descriptions = ""
+        if chunk.meta and hasattr(chunk.meta, 'doc_items'):
+            for item in chunk.meta.doc_items:
+                # If Docling captured a picture for this item
+                if hasattr(item, 'image') and item.image is not None:
+                    image_descriptions += describe_image_with_qwen(item.image)
+
+        # 3. Combine Text + Image Description + Structural Context
+        combined_chunk_text = docling_context_text + image_descriptions
+        enriched_text = generate_contextual_prefix(combined_chunk_text, doc_summary, filename)
         
         # [Keep your existing BGE-M3 Dense/Sparse embedding logic here...]
         embeddings = embed_model.encode([enriched_text], return_dense=True, return_sparse=True)
@@ -246,10 +288,11 @@ def ingest_file(file_path, user_id="u_default"):
                 id=unique_id, 
                 vector={"": dense_vec.tolist(), "sparse": sparse_vector},
                 payload={
-                    "text": enriched_text, # Store the enriched context!
+                    "text": enriched_text, 
                     "raw_text": raw_text,
                     "filename": filename,
-                    "source_type": "semantic_object", 
+                    "product_category": category, # Injected metadata
+                    "source_type": "semantic_object_with_vision", 
                     "user_id": user_id,
                     "file_url": f'http://{WINDOWS_IP}:9000/browser/uploads/{safe_filename}',
                     "chunk_id": global_chunk_idx

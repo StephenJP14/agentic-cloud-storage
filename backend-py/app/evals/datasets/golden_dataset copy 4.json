@@ -1,0 +1,122 @@
+[
+    {
+        "source_file": "Manual Book - Google TV 100 inch.pdf",
+        "question_type": "Procedural",
+        "question": "Gimana cara nyalain TV Zyrex 100 inch kalau lampunya merah?",
+        "ground_truth": "Tekan tombol daya di TV atau di remote control untuk menghidupkan TV."
+    },
+    {
+        "source_file": "Manual Book - Google TV 100 inch.pdf",
+        "question_type": "Troubleshooting",
+        "question": "Kenapa TV-ku nggak nyala dan lampu indikator merah kedap-kedip?",
+        "ground_truth": "TV mungkin dalam mode siaga. Coba tekan tombol daya di TV atau remote untuk nyalain. Jika masih nggak nyala, cek kabel daya dan pastikan stekernya masuk ke stopkontak dengan baik."
+    },
+    {
+        "source_file": "Manual Book - Google TV 100 inch.pdf",
+        "question_type": "Factual/Specs",
+        "question": "Berapa jarak minimum yang harus dijaga antara TV dan peralatan lain biar nggak panas?",
+        "ground_truth": "Jarak minimum harus dijaga agar tidak terjadi penumpukan panas, tapi dokumen tidak menyebutkan angka spesifik. Harap rujuk ke panduan pemasangan atau petunjuk keamanan."
+    },
+    {
+        "source_file": "Manual Book - Google TV 100 inch.pdf",
+        "question_type": "Image-referencing",
+        "question": "Tombol warna hijau di belakang TV fungsinya buat apa?",
+        "ground_truth": "Dokumen tidak menyebutkan tombol berwarna hijau atau fungsinya. Gambar di buku panduan hanya untuk referensi, dan tidak ada deskripsi spesifik tentang tombol hijau."
+    },
+    {
+        "source_file": "Manual Book - Google TV 100 inch.pdf",
+        "question_type": "Negative/Out-of-scope",
+        "question": "Bisa nggak main Genshin Impact di TV ini?",
+        "ground_truth": "Informasi tidak tersedia dalam dokumen referensi."
+    },
+    {
+        "source_file": "Manual Book - Google TV 85 inch.pdf",
+        "question_type": "Procedural",
+        "question": "Cara nyalain TV Zyrex 85 inch pas baru dibeli gimana?",
+        "ground_truth": "Nyalain TV Zyrex 85 inch: 1. Sambungkan kabel antena ke soket antena di belakang TV. 2. Sambungkan kabel daya TV. 3. Tekan tombol daya TV atau tombol daya di remote control untuk nyalain."
+    },
+    {
+        "source_file": "Manual Book - Google TV 85 inch.pdf",
+        "question_type": "Troubleshooting",
+        "question": "Kenapa lampu indikator TV-ku merah kedap-kedip?",
+        "ground_truth": "Lampu indikator merah kedap-kedip biasanya menandakan TV dalam mode siaga. Tekan tombol daya TV atau tombol daya di remote control untuk nyalain TV. Jika masalah tetap ada, cek kabel daya dan stopkontak, pastikan tidak ada kabel yang terjepit atau rusak."
+    },
+    {
+        "source_file": "Manual Book - Google TV 85 inch.pdf",
+        "question_type": "Factual/Specs",
+        "question": "Berapa jarak minimum yang harus jauh dari sumber panas biar TV gak rusak?",
+        "ground_truth": "TV harus ditempatkan setidaknya 10 cm jauh dari sumber panas seperti lampu, lilin, atau mesin pemanas. Hindari pula menempatkannya di bawah sinar matahari langsung atau di dekat peralatan yang menghasilkan panas."
+    },
+    {
+        "source_file": "Manual Book - Google TV 85 inch.pdf",
+        "question_type": "Image-referencing",
+        "question": "Tombol warna hijau di remote TV-ku fungsinya buat apa?",
+        "ground_truth": "Tombol hijau di remote TV biasanya untuk fungsi 'OK' atau 'Confirm' dalam menu. Namun, karena dokumen tidak menyertakan gambar remote atau penjelasan detail tombol, silakan rujuk ke manual remote TV atau gunakan tombol lain untuk navigasi menu."
+    },
+    {
+        "source_file": "Manual Book - Google TV 85 inch.pdf",
+        "question_type": "Negative/Out-of-scope",
+        "question": "Bisa nggak main Genshin Impact di TV Zyrex 85 inch ini?",
+        "ground_truth": "Informasi tidak tersedia dalam dokumen referensi. Dokumen ini hanya menjelaskan cara pemasangan, koneksi, dan keselamatan penggunaan TV, bukan spesifikasi game atau kompatibilitas aplikasi."
+    },
+    {
+        "source_file": "Manual Book - Cruiser 20 100 unit.pdf",
+        "question_type": "Procedural",
+        "question": "Gimana cara nyalain laptop Zyrex Cruiser 20?",
+        "ground_truth": "Tekan tombol Daya hingga layar menyala. Tunggu hingga layar Desktop muncul; laptop kini siap digunakan."
+    },
+    {
+        "source_file": "Manual Book - Cruiser 20 100 unit.pdf",
+        "question_type": "Troubleshooting",
+        "question": "Kenapa layar laptop aku nggak nyala pas dinyalain?",
+        "ground_truth": "Cek apakah tombol daya rusak atau baterai habis. Pastikan juga tidak ada benturan atau kelembapan yang merusak perangkat. Jika masih nggak bisa, hubungi customer service."
+    },
+    {
+        "source_file": "Manual Book - Cruiser 20 100 unit.pdf",
+        "question_type": "Factual/Specs",
+        "question": "Berapa resolusi kamera depan Zyrex Cruiser 20?",
+        "ground_truth": "Kamera depan memiliki resolusi 2MP."
+    },
+    {
+        "source_file": "Manual Book - Cruiser 20 100 unit.pdf",
+        "question_type": "Image-referencing",
+        "question": "Tombol daya ada di mana di laptop ini?",
+        "ground_truth": "Tombol daya biasanya berada di sudut kanan bawah atau di sisi kanan atas casing, sesuai dengan gambar di panduan. Cek gambar di bagian 'Menyalakan & Mematikan Laptop' untuk referensi visual."
+    },
+    {
+        "source_file": "Manual Book - Cruiser 20 100 unit.pdf",
+        "question_type": "Negative/Out-of-scope",
+        "question": "Bisa nggak main Genshin Impact di laptop ini?",
+        "ground_truth": "Informasi tentang kemampuan bermain game seperti Genshin Impact tidak tersedia di dokumen ini."
+    },
+    {
+        "source_file": "Manual Book Cruiser 22 - Final.pdf",
+        "question_type": "Procedural",
+        "question": "Cara nyalain laptop Zyrex Cruiser 22 gimana?",
+        "ground_truth": "Tekan dan tahan tombol daya sampai perangkat menyala."
+    },
+    {
+        "source_file": "Manual Book Cruiser 22 - Final.pdf",
+        "question_type": "Troubleshooting",
+        "question": "Kenapa lampu indikator pengisian daya nggak nyala?",
+        "ground_truth": "Pastikan kabel daya terhubung dengan benar ke stopkontak dan port daya perangkat. Jika masih nggak nyala, cek apakah baterai dalam kondisi baik atau ada kerusakan pada port daya."
+    },
+    {
+        "source_file": "Manual Book Cruiser 22 - Final.pdf",
+        "question_type": "Factual/Specs",
+        "question": "Berapa watt charger bawaan laptop ini?",
+        "ground_truth": "Dokumen tidak menyebutkan spesifikasi watt charger bawaan."
+    },
+    {
+        "source_file": "Manual Book Cruiser 22 - Final.pdf",
+        "question_type": "Image-referencing",
+        "question": "Tombol warna hijau di sisi kiri laptop fungsinya apa?",
+        "ground_truth": "Dokumen tidak menyebutkan adanya tombol warna hijau atau fungsinya."
+    },
+    {
+        "source_file": "Manual Book Cruiser 22 - Final.pdf",
+        "question_type": "Negative/Out-of-scope",
+        "question": "Bisa nggak main game GTA V di laptop ini?",
+        "ground_truth": "Informasi tidak tersedia dalam dokumen."
+    }
+]
