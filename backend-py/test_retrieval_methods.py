@@ -1,8 +1,10 @@
+import csv
 import json
 import math
 from pathlib import Path
 from typing import Any
 
+import matplotlib.pyplot as plt
 import numpy as np
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
@@ -221,15 +223,18 @@ def format_hit_list(results: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def evaluate_methods(max_queries: int | None = None) -> None:
+def evaluate_methods(max_queries: int | None = None, verbose: bool = True) -> dict[str, dict[str, float]]:
     dataset = load_golden_dataset()
     if max_queries is not None:
         dataset = dataset[:max_queries]
 
+    avg_results: dict[str, dict[str, float]] = {}
+
     for method_name, method_fn in RETRIEVAL_METHODS:
-        print("\n" + "#" * 80)
-        print(f"Evaluating method: {method_name}")
-        print("#" * 80)
+        if verbose:
+            print("\n" + "#" * 80)
+            print(f"Evaluating method: {method_name}")
+            print("#" * 80)
 
         totals = {"hit@5": 0.0, "recall@5": 0.0, "mrr@5": 0.0, "ndcg@5": 0.0}
         for item in dataset:
@@ -239,23 +244,69 @@ def evaluate_methods(max_queries: int | None = None) -> None:
             metrics = compute_metrics(retrieved, gold_file, top_k=5)
             totals = {k: totals[k] + metrics[k] for k in totals}
 
-            print(f"\nQuery: {query}")
-            print(f"Ground truth file: {gold_file}")
-            print(format_hit_list(retrieved))
-            print(
-                f"Metrics: hit@5={metrics['hit@5']:.2f}, recall@5={metrics['recall@5']:.2f}, "
-                f"mrr@5={metrics['mrr@5']:.3f}, ndcg@5={metrics['ndcg@5']:.3f}"
-            )
+            if verbose:
+                print(f"\nQuery: {query}")
+                print(f"Ground truth file: {gold_file}")
+                print(format_hit_list(retrieved))
+                print(
+                    f"Metrics: hit@5={metrics['hit@5']:.2f}, recall@5={metrics['recall@5']:.2f}, "
+                    f"mrr@5={metrics['mrr@5']:.3f}, ndcg@5={metrics['ndcg@5']:.3f}"
+                )
 
         count = len(dataset)
-        print("\nSummary:")
-        print(f"Queries evaluated: {count}")
-        print(
-            f"Average hit@5: {totals['hit@5'] / count:.3f}, "
-            f"Average recall@5: {totals['recall@5'] / count:.3f}, "
-            f"Average MRR@5: {totals['mrr@5'] / count:.3f}, "
-            f"Average nDCG@5: {totals['ndcg@5'] / count:.3f}"
-        )
+        avg_metrics = {k: totals[k] / count for k in totals}
+        avg_results[method_name] = avg_metrics
+
+        if verbose:
+            print("\nSummary:")
+            print(f"Queries evaluated: {count}")
+            print(
+                f"Average hit@5: {avg_metrics['hit@5']:.3f}, "
+                f"Average recall@5: {avg_metrics['recall@5']:.3f}, "
+                f"Average MRR@5: {avg_metrics['mrr@5']:.3f}, "
+                f"Average nDCG@5: {avg_metrics['ndcg@5']:.3f}"
+            )
+
+    return avg_results
+
+
+def save_metrics_csv(avg_results: dict[str, dict[str, float]], output_path: Path) -> None:
+    with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["method", "hit@5", "recall@5", "mrr@5", "ndcg@5"])
+        for method_name, metrics in avg_results.items():
+            writer.writerow([
+                method_name,
+                metrics["hit@5"],
+                metrics["recall@5"],
+                metrics["mrr@5"],
+                metrics["ndcg@5"],
+            ])
+
+
+def plot_average_metrics(avg_results: dict[str, dict[str, float]], output_path: Path) -> None:
+    methods = list(avg_results.keys())
+    metrics = ["hit@5", "recall@5", "mrr@5", "ndcg@5"]
+    values = [[avg_results[method][metric] for method in methods] for metric in metrics]
+
+    x = np.arange(len(methods))
+    width = 0.18
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    for idx, metric in enumerate(metrics):
+        ax.bar(x + idx * width - width * 1.5, values[idx], width, label=metric)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(methods, rotation=20, ha="right")
+    ax.set_ylim(0, 1.0)
+    ax.set_ylabel("Average score")
+    ax.set_title("Average retrieval metrics by method")
+    ax.legend()
+    ax.grid(axis="y", linestyle="--", alpha=0.4)
+
+    plt.tight_layout()
+    fig.savefig(output_path, dpi=180)
+    plt.close(fig)
 
 
 def test_retrieval_methods_return_results() -> None:
@@ -270,4 +321,13 @@ def test_retrieval_methods_return_results() -> None:
 
 
 if __name__ == "__main__":
-    evaluate_methods(max_queries=10)
+    max_queries = 20
+    avg_results = evaluate_methods(max_queries=max_queries, verbose=False)
+
+    output_csv = BASE_DIR / "retrieval_avg_metrics.csv"
+    output_png = BASE_DIR / "retrieval_avg_metrics.png"
+    save_metrics_csv(avg_results, output_csv)
+    plot_average_metrics(avg_results, output_png)
+
+    print(f"Saved average metrics CSV to: {output_csv}")
+    print(f"Saved plot image to: {output_png}")
