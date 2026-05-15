@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-POSGRES_HOST = os.getenv("WINDOWS_IP", "localhost")
+POSGRES_HOST = os.getenv("WINDOWS_IP", "db")
 POSGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
 
 DATABASE_URL = f"postgresql://admin:password123@{POSGRES_HOST}:{POSGRES_PORT}/agent_db"

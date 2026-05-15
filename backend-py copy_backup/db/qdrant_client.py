@@ -5,7 +5,7 @@ from qdrant_client.http import models
 
 load_dotenv()
 
-QDRANT_HOST = os.getenv("WINDOWS_IP", "localhost")
+QDRANT_HOST = os.getenv("WINDOWS_IP", "qdrant")
 QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
 
 qdrant_client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)

@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Get IP from .env (Your Windows IP), fallback to localhost if missing
-REDIS_HOST = os.getenv("WINDOWS_IP", "localhost")
+REDIS_HOST = os.getenv("WINDOWS_IP", "redis")
 REDIS_PORT = 6379
 
 # Create the connection pool
