@@ -3,6 +3,7 @@ import math
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from langchain_core.documents import Document
@@ -11,7 +12,7 @@ from langchain_community.document_compressors.flashrank_rerank import FlashrankR
 from app.core.config import QDRANT_URL, COLLECTION_NAME
 from app.services.embed_model import get_embed_model
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent
 GOLDEN_DATA_PATH = BASE_DIR / "golden_dataset.json"
 
 client = QdrantClient(url=QDRANT_URL)
@@ -27,19 +28,33 @@ def load_golden_dataset(path: Path = GOLDEN_DATA_PATH) -> list[dict[str, Any]]:
 def build_sparse_vector(lexical_weights: dict[str, float]) -> models.SparseVector:
     tokens = list(lexical_weights.keys())
     weights = list(lexical_weights.values())
-    ids = embed_model.tokenizer.convert_tokens_to_ids(tokens)
+
+    try:
+        ids = [int(token) for token in tokens]
+    except ValueError:
+        ids = embed_model.tokenizer.convert_tokens_to_ids(tokens)
 
     dedup_sparse: dict[int, float] = {}
     for idx, w in zip(ids, weights):
-        if idx not in dedup_sparse or w > dedup_sparse[idx]:
-            dedup_sparse[idx] = w
+        if idx not in dedup_sparse or float(w) > dedup_sparse[idx]:
+            dedup_sparse[idx] = float(w)
 
     return models.SparseVector(indices=list(dedup_sparse.keys()), values=list(dedup_sparse.values()))
 
 
 def encode_query(query: str) -> tuple[list[float], models.SparseVector]:
     emb = embed_model.encode(query, return_dense=True, return_sparse=True)
-    dense_vec = emb["dense_vecs"][0].tolist()
+    dense_vec = emb["dense_vecs"]
+    if isinstance(dense_vec, np.ndarray):
+        if dense_vec.ndim == 1:
+            dense_vec = dense_vec.tolist()
+        elif dense_vec.ndim == 2 and dense_vec.shape[0] == 1:
+            dense_vec = dense_vec[0].tolist()
+        else:
+            raise ValueError(f"Unexpected dense embedding shape: {dense_vec.shape}")
+    else:
+        dense_vec = list(dense_vec)
+
     sparse_vec = build_sparse_vector(emb["lexical_weights"])
     return dense_vec, sparse_vec
 
