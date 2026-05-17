@@ -44,16 +44,21 @@ class PartialFormExtractor(BaseModel):
     complaints: str = Field(default="", description="Keluhan kendala kerusakan laptop")
 
 capture_prompt = ChatPromptTemplate.from_messages([
-    ("system", """Anda adalah parser JSON ketat untuk Service Center Zyrex.
-Tugas Anda adalah mengekstrak informasi dari pesan terakhir user ke dalam schema yang ditentukan.
+    ("system", """Anda adalah AI Parser data teks yang sangat cerdas dan teliti untuk Service Center Zyrex.
+Tugas utama Anda adalah mengekstrak data dari pesan user ke dalam skema atribut JSON yang disediakan.
 
-Aturan Pemetaan:
-- "Phone" atau "No HP" atau "WhatsApp" -> ekstrak ke 'phone_number' (hanya angka)
-- "Product SN" atau "SN" -> ekstrak ke 'product_sn'
-- "Address" -> ekstrak ke 'address'
-- "Complaints" atau "Keluhan" -> ekstrak ke 'complaints'
+ATURAN EKSTRAKSI STRICT:
+1. Cari baris yang mengandung kata kunci di bawah ini (tidak masalah besar/kecil hurufnya):
+   - "Nama" atau "Nama Pelanggan" -> ekstrak ke 'name'
+   - "Phone" atau "Nomor Telepon" atau "No HP" atau "HP" -> ekstrak ke 'phone_number' (hanya ambil angka)
+   - "Email" -> ekstrak ke 'email'
+   - "Address" atau "Alamat" -> ekstrak ke 'address'
+   - "Product Type" atau "Tipe Produk" -> ekstrak ke 'product_type'
+   - "Product SN" atau "Nomor Seri" -> ekstrak ke 'product_sn'
+   - "Complaints" atau "Keluhan" -> ekstrak ke 'complaints'
 
-PENTING: JANGAN memberikan salam, jangan membuat format laporan baru. Cukup ekstrak datanya saja ke bidang yang tepat. Jika tidak ada, biarkan kosong."""),
+2. PERINGATAN: Di dalam pesan user mungkin terdapat teks template tambahan seperti 'Catatan Internal', 'Status Awal', dll. ABAIKAN teks template tambahan tersebut! Fokus HANYA pada data diri pelanggan yang diisi di baris-baris awal.
+3. Jika sebuah data tidak ditemukan sama sekali atau isinya masih berupa template kosong seperti '[Isi Nama]', biarkan string kosong (""). Jangan mengarang data."""),
     ("human", "{question}")
 ])
 capture_chain = capture_prompt | llm.with_structured_output(PartialFormExtractor)
@@ -159,18 +164,21 @@ def build_rag_prompt(docs: list[Document], user_question: str) -> str:
 ATURAN KRUSIAL:
 1. Pandu pengguna langkah demi langkah jika mereka bertanya tentang troubleshooting.
 2. Jangan menebak spesifikasi. Gunakan HANYA informasi dari dokumen.
-3. ATURAN WAJIB: Di akhir jawaban Anda, Anda WAJIB menawarkan booking service kepada pengguna dengan format kalimat tepat seperti di bawah ini:
+3. ATURAN WAJIB: Di akhir jawaban Anda, Anda WAJIB menawarkan booking service kepada pengguna dengan format kalimat dan form yang rapi baris demi baris seperti di bawah ini:
+
 "Jika setelah mencoba langkah-langkah di atas masalah tetap berlanjut, kemungkinan ada masalah perangkat lunak atau perangkat keras yang memerlukan penanganan lebih lanjut.
 Apakah Anda ingin saya bantu booking service untuk kendala ini?
 
-Jika iya, silahkan lengkapi form ini:
+Jika iya, silahkan salin dan lengkapi form di bawah ini:
+```text
 Nama: [Isi Nama Lengkap]
 Phone: [Isi Nomor HP/WhatsApp]
 Email: [Isi Alamat Email]
 Address: [Isi Alamat Lengkap]
 Product Type: Laptop
 Product SN: [Isi Serial Number Perangkat]
-Complaints: [Detail Keluhan]"
+Complaints: {user_question}
+Catatan: Silakan ganti teks di dalam tanda kurung kotak [ ], lalu kirimkan kembali balasan Anda ke sini."
 
 PERTANYAAN: "{user_question}"
 
@@ -232,7 +240,23 @@ def service_capture_node(state: AgentState):
             if new_extract.complaints and "[isi" not in new_extract.complaints.lower(): form_data["complaints"] = new_extract.complaints
         except Exception as e:
             print(f"❌ [EXTRACT ERROR] Gagal ekstraksi structured output: {str(e)}")
+        import re
+        def extract_via_regex(pattern, text):
+            match = re.search(pattern, text, re.IGNORECASE)
+            return match.group(1).strip() if match else ""
 
+        if not form_data["name"]:
+            form_data["name"] = extract_via_regex(r"(?:Nama Pelanggan|Nama)\s*:\s*([^\n]+)", question)
+        if not form_data["email"]:
+            form_data["email"] = extract_via_regex(r"Email\s*:\s*([^\n\s]+)", question)
+        if not form_data["address"]:
+            form_data["address"] = extract_via_regex(r"(?:Alamat|Address)\s*:\s*([^\n]+)", question)
+        if not form_data["phone_number"]:
+            phone_raw = extract_via_regex(r"(?:Nomor Telepon|Phone|No HP|Telp|HP|WA)\s*:\s*([^\n]+)", question)
+            form_data["phone_number"] = re.sub(r"\D", "", phone_raw) if phone_raw else ""
+        if not form_data["product_sn"]:
+            form_data["product_sn"] = extract_via_regex(r"(?:Nomor Seri \(SN\)|Product SN|SN)\s*:\s*([^\n]+)", question)
+            
     # Validasi field yang kosong
     missing_fields = []
     if not form_data["name"]: missing_fields.append("Nama")
@@ -310,16 +334,23 @@ def service_capture_node(state: AgentState):
     try:
         response = session.post(f"{go_backend_url}/api/cs/", json=go_payload, timeout=10)
         if response.status_code == 201:
+            # FORMAT SINGKAT DAN RAPI SESUAI PERMINTAAN ANDA
             feedback = (
-                f"### Booking Service Berhasil! 🎉\n\n"
-                f"Tiket perbaikan Anda telah berhasil dibuat di sistem database kami:\n\n"
-                f"* **Nomor Tiket:** `{ticket_id}`\n"
-                f"* **Nama Pelapor:** {form_data['name']}\n"
-                f"* **Nomor HP:** {form_data['phone_number']}\n"
-                f"* **Alamat Lengkap:** {form_data['address']}\n"
-                f"* **Perangkat:** {form_data['product_type']} ({form_data['product_sn']})\n"
-                f"* **Keluhan:** *{form_data['complaints']}*\n\n"
-                f"Tim teknisi kami akan segera menghubungi Anda untuk konfirmasi jadwal kedatangan. Terima kasih!"
+                f"### Laporan Keluhan Pelanggan\n"
+                f"**Nama Pelanggan:** {form_data['name']}\n"
+                f"**Nomor Telepon:** {form_data['phone_number']}\n"
+                f"**Email:** {form_data['email']}\n"
+                f"**Alamat:** {form_data['address']}\n"
+                f"**Tipe Produk:** {form_data['product_type']}\n"
+                f"**Nomor Seri (SN):** {form_data['product_sn']}\n"
+                f"**Keluhan:** {form_data['complaints']}\n\n"
+                f"**Status Laporan:**\n"
+                f"✅ Diterima dan sedang diproses oleh tim teknis. (ID Tiket: `{ticket_id}`)\n\n"
+                f"Anda bisa mengecek status laporan anda disini:\n"
+                f"https://zyrex.com/service\n\n"
+                f"Silahkan hubungi CS untuk informasi lainnya:\n"
+                f"* **WA:** 123\n"
+                f"* **Email:** cs@zyrex.com"
             )
         elif response.status_code == 400:
             error_data = response.json()
