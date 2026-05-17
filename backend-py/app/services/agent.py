@@ -63,6 +63,35 @@ ATURAN EKSTRAKSI STRICT:
 ])
 capture_chain = capture_prompt | llm.with_structured_output(PartialFormExtractor)
 
+
+# ==========================================
+# NEW: GUARDRAIL TOPIK (Filter Topik Luar Zyrex)
+# ==========================================
+class TopicCheck(BaseModel):
+    is_allowed: bool = Field(..., description="True jika berkaitan dengan produk Zyrex, masalah laptop/PC, sapaan/chitchat CS, atau booking service. False jika bertanya hal umum lain seperti resep masakan, pemrograman/coding, matematika, tugas sekolah, dll.")
+    reason: str = Field(..., description="Alasan singkat penentuan kategori.")
+
+guardrail_prompt = ChatPromptTemplate.from_messages([
+    ("system", """Anda adalah sistem keamanan (Guardrail) untuk Chatbot Customer Service Zyrex.
+Tugas Anda adalah menganalisis apakah input user relevan dengan ruang lingkup Customer Service Zyrex atau tidak.
+
+RUANG LINGKUP YANG DIIZINKAN:
+- Pertanyaan teknis/troubleshooting laptop, PC, All-In-One, komputer (misal: bluescreen, mati total, lemot).
+- Pembahasan mengenai produk, spesifikasi, garansi, atau buku manual Zyrex.
+- Sapaan ramah pembuka/penutup chitchat CS (misal: halo, selamat pagi, terima kasih, bye).
+- Proses booking service atau pengisian data perbaikan.
+
+RUANG LINGKUP YANG DILARANG (Berikan False):
+- Meminta resep masakan, tips diet, kesehatan.
+- Meminta menulis/debug kode pemrograman (coding), kalkulasi matematika rumit.
+- Pertanyaan umum/akademik yang tidak ada hubungannya dengan komputer/Zyrex (misal: "siapa presiden pertama RI", "buatkan esai sejarah").
+
+Analisis pesan user secara objektif."""),
+    ("human", "{question}")
+])
+guardrail_chain = guardrail_prompt | llm.with_structured_output(TopicCheck)
+
+
 # ==========================================
 # Router Chain (Hanya dipakai jika kondisi aman)
 # ==========================================
@@ -92,48 +121,78 @@ class AgentState(TypedDict):
     loop_count: int
     is_booking_mode: bool
     extracted_form_data: dict
+    is_topic_allowed: bool  # NEW: Menyimpan status validasi topik
+
+
+# ==========================================
+# NEW NODE: Guardrail Node
+# ==========================================
+def guardrail_node(state: AgentState):
+    last_message = state["messages"][-1].content
+    print(f"🛡️ [GUARDRAIL] Memeriksa konten: '{last_message}'")
+    
+    # Bypass guardrail jika sedang dalam mode booking aktif (untuk mencegah form data ter-block salah sasaran)
+    if state.get("is_booking_mode", False):
+        return {"is_topic_allowed": True}
+        
+    try:
+        check = guardrail_chain.invoke({"question": last_message})
+        print(f"🛡️ [GUARDRAIL RESULT] Allowed: {check.is_allowed} | Reason: {check.reason}")
+        return {"is_topic_allowed": check.is_allowed}
+    except Exception as e:
+        print(f"❌ [GUARDRAIL ERROR] Gagal cek topik, fallback ke True: {e}")
+        return {"is_topic_allowed": True}
+
+def out_of_topic_node(state: AgentState):
+    response = (
+        "Mohon maaf, saya adalah Tech Support Assistant resmi Zyrex. "
+        "Saya hanya dapat membantu Anda terkait pertanyaan produk Zyrex, kendala teknis perangkat, "
+        "informasi garansi, dan pendaftaran booking service center. "
+        "Silakan ajukan pertanyaan yang berkaitan dengan layanan Zyrex ya! 😊"
+    )
+    return {"messages": [AIMessage(content=response)]}
+
 
 # ==========================================
 # DETERMINISTIC ROUTER NODE (BYPASS LLM)
 # ==========================================
+# ==========================================
+# REVISI DETERMINISTIC ROUTER NODE
+# ==========================================
 def router_node(state: AgentState):
-    # .strip() membuang spasi hantu di awal/akhir, .lower() menyamakan huruf kecil
     last_message = state["messages"][-1].content.strip().lower()
     print(f"🕵️ [ROUTER DEBUG] Pesan Terakhir User: '{last_message}'")
     
-    # KONDISI KHUSUS 1: Jika sudah dalam mode booking, kunci terus di service_capture
+    # KONDISI KHUSUS 1: Jika sudah benar-benar dalam mode booking aktif, kunci terus di service_capture
     if state.get("is_booking_mode", False):
-        print("🧭 [ROUTER] State Lock: User sedang mengisi form booking.")
+        print("🧭 [ROUTER] State Lock: User sedang dalam proses booking aktif.")
         return {"context": "service_capture"}
         
-    # KONDISI KHUSUS 2: Cek riwayat apakah bot di pesan sebelumnya menawarkan booking
+    # KONDISI KHUSUS 2: Cek apakah bot di pesan sebelumnya menawarkan booking
     ai_offered = False
     for msg in reversed(state["messages"][:-1]):
         if msg.type == "ai":
             ai_content = msg.content.lower()
-            if "booking service" in ai_content or "booking servis" in ai_content:
+            if "booking service" in ai_content or "booking servis" in ai_content or "jadwal (booking)" in ai_content:
                 ai_offered = True
-                print(f"🎯 [ROUTER DEBUG] Terdeteksi AI menawarkan booking sebelumnya: '{msg.content[:30]}...'")
+                print(f"🎯 [ROUTER DEBUG] Terdeteksi AI menawarkan booking sebelumnya.")
                 break
                 
-    # KONDISI MUTLAK (Bypass LLM secara agresif):
-    # Daftar kata persetujuan pendek dari user
-    positive_answers = ["boleh", "mau", "iya", "ya", "silakan", "silahkan", "oke", "ok", "bisa"]
-    
-    # Pengecekan A: Jika AI menawarkan booking DAN user merespon dengan kata persetujuan pendek
+    # Kata-kata persetujuan dari user
+    positive_answers = ["boleh", "mau", "iya", "ya", "silakan", "silahkan", "oke", "ok", "bisa", "lanjut"]
     is_positive_respond = any(tgt == last_message or last_message.startswith(tgt) for tgt in positive_answers)
     
-    # Pengecekan B: Jika user langsung mengetik kalimat booking secara mandiri
-    is_direct_booking_intent = any(kw in last_message for kw in ["bantu booking", "booking service", "booking servis", "buatkan jadwal", "mau service", "mau servis"])
-    
-    # Pengecekan C: BARU - Jika user langsung mengisi/mengirimkan potongan form (copy-paste form)
+    is_direct_booking_intent = any(kw in last_message for kw in ["bantu booking", "booking service", "booking servis", "buatkan jadwal"])
     is_submitting_form = any(field in last_message for field in ["nama:", "phone:", "address:", "product sn:"])
     
+    # PERBAIKAN DI SINI: Masuk ke service_capture JIKA (AI menawarkan DAN direspon positif), 
+    # ATAU memang user minta booking langsung, ATAU user langsung kirim data form.
     if (ai_offered and is_positive_respond) or is_direct_booking_intent or is_submitting_form:
-        print("🧭 [ROUTER] HARD LOCK TRIGGERED: Memaksa masuk ke node service_capture.")
+        print("🧭 [ROUTER] HARD LOCK TRIGGERED: Masuk ke node service_capture.")
         return {"context": "service_capture"}
         
-    # Jalur normal via LLM untuk kueri pencarian dokumen teknis jika tidak ada trigger booking
+    # Jika AI menawarkan booking, tapi user malah nanya hal lain (tidak merespon positif seperti 'ya/mau'),
+    # maka jalur dikembalikan secara normal ke LLM Router agar bisa masuk ke Vectorstore/RAG!
     try:
         decision = router_chain.invoke({"question": state["messages"][-1].content}).datasource
     except Exception as e:
@@ -164,21 +223,10 @@ def build_rag_prompt(docs: list[Document], user_question: str) -> str:
 ATURAN KRUSIAL:
 1. Pandu pengguna langkah demi langkah jika mereka bertanya tentang troubleshooting.
 2. Jangan menebak spesifikasi. Gunakan HANYA informasi dari dokumen.
-3. ATURAN WAJIB: Di akhir jawaban Anda, Anda WAJIB menawarkan booking service kepada pengguna dengan format kalimat dan form yang rapi baris demi baris seperti di bawah ini:
+3. ATURAN WAJIB: Di akhir jawaban Anda, jika masalah belum terselesaikan, Anda WAJIB menawarkan booking service kepada pengguna dengan kalimat konfirmasi singkat. Jangan berikan formulir pendaftaran terlebih dahulu.
 
-"Jika setelah mencoba langkah-langkah di atas masalah tetap berlanjut, kemungkinan ada masalah perangkat lunak atau perangkat keras yang memerlukan penanganan lebih lanjut.
-Apakah Anda ingin saya bantu booking service untuk kendala ini?
-
-Jika iya, silahkan salin dan lengkapi form di bawah ini:
-```text
-Nama: [Isi Nama Lengkap]
-Phone: [Isi Nomor HP/WhatsApp]
-Email: [Isi Alamat Email]
-Address: [Isi Alamat Lengkap]
-Product Type: Laptop
-Product SN: [Isi Serial Number Perangkat]
-Complaints: {user_question}
-Catatan: Silakan ganti teks di dalam tanda kurung kotak [ ], lalu kirimkan kembali balasan Anda ke sini."
+Contoh kalimat di akhir:
+"Apakah Anda ingin saya bantu buatkan jadwal (booking) service untuk kendala ini?"
 
 PERTANYAAN: "{user_question}"
 
@@ -221,15 +269,33 @@ def service_capture_node(state: AgentState):
         if not form_data["complaints"]:
             form_data["complaints"] = "Perbaikan kendala sistem perangkat laptop"
 
-    # Cek apakah ini kata konfirmasi pendek, jika BUKAN, maka jalankan ekstraksi LLM
-    bypass_keywords = ["boleh", "mau", "iya", "ya", "silakan", "silahkan", "bantu booking"]
+    bypass_keywords = ["boleh", "mau", "iya", "ya", "silakan", "silahkan", "bantu booking", "oke", "ok", "bisa"]
     is_short_confirm = any(kw == question.strip().lower() for kw in bypass_keywords)
+
+    if is_short_confirm and not state.get("is_booking_mode", False):
+        bot_message = (
+            "Baik, mohon lengkapi formulir pendaftaran service di bawah ini terlebih dahulu:\n\n"
+            "```text\n"
+            f"Nama: [Isi Nama Lengkap]\n"
+            f"Phone: [Isi Nomor HP/WhatsApp]\n"
+            f"Email: [Isi Alamat Email]\n"
+            f"Address: [Isi Alamat Lengkap]\n"
+            f"Product Type: Laptop\n"
+            f"Product SN: [Isi Serial Number Perangkat]\n"
+            f"Complaints: {form_data['complaints']}\n"
+            "```\n"
+            "*Catatan: Silakan salin pesan di atas, ganti teks di dalam tanda kurung kotak [ ], lalu kirimkan kembali.*"
+        )
+        return {
+            "messages": [AIMessage(content=bot_message)],
+            "is_booking_mode": True,
+            "extracted_form_data": form_data
+        }
 
     if not is_short_confirm:
         try:
             print("🧠 [CAPTURE] Mengirim ke LLM Extractor...")
             new_extract = capture_chain.invoke({"question": question})
-            print(f"🔍 [CAPTURE DEBUG] Hasil LLM Extractor: {new_extract}")
             
             if new_extract.name and "[isi" not in new_extract.name.lower(): form_data["name"] = new_extract.name
             if new_extract.email and "[isi" not in new_extract.email.lower(): form_data["email"] = new_extract.email
@@ -240,24 +306,20 @@ def service_capture_node(state: AgentState):
             if new_extract.complaints and "[isi" not in new_extract.complaints.lower(): form_data["complaints"] = new_extract.complaints
         except Exception as e:
             print(f"❌ [EXTRACT ERROR] Gagal ekstraksi structured output: {str(e)}")
+
         import re
         def extract_via_regex(pattern, text):
             match = re.search(pattern, text, re.IGNORECASE)
             return match.group(1).strip() if match else ""
 
-        if not form_data["name"]:
-            form_data["name"] = extract_via_regex(r"(?:Nama Pelanggan|Nama)\s*:\s*([^\n]+)", question)
-        if not form_data["email"]:
-            form_data["email"] = extract_via_regex(r"Email\s*:\s*([^\n\s]+)", question)
-        if not form_data["address"]:
-            form_data["address"] = extract_via_regex(r"(?:Alamat|Address)\s*:\s*([^\n]+)", question)
+        if not form_data["name"]: form_data["name"] = extract_via_regex(r"(?:Nama Pelanggan|Nama)\s*:\s*([^\n]+)", question)
+        if not form_data["email"]: form_data["email"] = extract_via_regex(r"Email\s*:\s*([^\n\s]+)", question)
+        if not form_data["address"]: form_data["address"] = extract_via_regex(r"(?:Alamat|Address)\s*:\s*([^\n]+)", question)
         if not form_data["phone_number"]:
             phone_raw = extract_via_regex(r"(?:Nomor Telepon|Phone|No HP|Telp|HP|WA)\s*:\s*([^\n]+)", question)
             form_data["phone_number"] = re.sub(r"\D", "", phone_raw) if phone_raw else ""
-        if not form_data["product_sn"]:
-            form_data["product_sn"] = extract_via_regex(r"(?:Nomor Seri \(SN\)|Product SN|SN)\s*:\s*([^\n]+)", question)
+        if not form_data["product_sn"]: form_data["product_sn"] = extract_via_regex(r"(?:Nomor Seri \(SN\)|Product SN|SN)\s*:\s*([^\n]+)", question)
             
-    # Validasi field yang kosong
     missing_fields = []
     if not form_data["name"]: missing_fields.append("Nama")
     if not form_data["phone_number"]: missing_fields.append("Phone")
@@ -265,10 +327,6 @@ def service_capture_node(state: AgentState):
     if not form_data["address"]: missing_fields.append("Address")
     if not form_data["product_sn"]: missing_fields.append("Product SN")
 
-    print(f"📊 [CAPTURE DEBUG] Current Form Data: {form_data}")
-    print(f"❌ [CAPTURE DEBUG] Missing Fields: {missing_fields}")
-
-    # JIKA DATA MASIH ADA YANG KOSONG -> RE-ASK TEMPLATE
     if missing_fields:
         tpl_name = form_data["name"] if form_data["name"] else "[Isi Nama Lengkap]"
         tpl_phone = form_data["phone_number"] if form_data["phone_number"] else "[Isi Nomor HP/WhatsApp]"
@@ -280,7 +338,7 @@ def service_capture_node(state: AgentState):
 
         bot_message = (
             f"Mohon maaf, data pendaftaran Anda belum lengkap ({', '.join(missing_fields)}).\n"
-            f"Silakan salin dan lengkapi kembali format data di bawah ini:\n\n"
+            f"Silakan lengkapi kembali format data di bawah ini:\n\n"
             f"```text\n"
             f"Nama: {tpl_name}\n"
             f"Phone: {tpl_phone}\n"
@@ -290,17 +348,15 @@ def service_capture_node(state: AgentState):
             f"Product SN: {tpl_prod_sn}\n"
             f"Complaints: {tpl_complaints}\n"
             f"```\n"
-            f"*Catatan: Pastikan semua tanda kurung kotak [ ] sudah diganti dengan data Anda.*"
+            f"*Catatan: Pastikan semua data di dalam tanda kurung kotak [ ] sudah diisi dengan benar.*"
         )
-        
         return {
             "messages": [AIMessage(content=bot_message)],
             "is_booking_mode": True,
             "extracted_form_data": form_data
         }
 
-    # JIKA DATA LENGKAP -> KIRIM KE API BACKEND GO
-    print("🚀 [API SERVICE] Data 100% lengkap! Mengirim payload ke Backend Go...")
+    print("🚀 [API SERVICE] Data lengkap! Mengirim payload ke Backend Go...")
     go_backend_url = os.getenv("GO_BACKEND_URL", "http://backend-go:8080") 
     session = requests.Session()
 
@@ -334,7 +390,6 @@ def service_capture_node(state: AgentState):
     try:
         response = session.post(f"{go_backend_url}/api/cs/", json=go_payload, timeout=10)
         if response.status_code == 201:
-            # FORMAT SINGKAT DAN RAPI SESUAI PERMINTAAN ANDA
             feedback = (
                 f"### Laporan Keluhan Pelanggan\n"
                 f"**Nama Pelanggan:** {form_data['name']}\n"
@@ -475,6 +530,12 @@ def check_hallucination_and_retry(state: AgentState):
         return "expand_query"
     return "generate"
 
+# NEW: Jalur Logika Guardrail di Titik Masuk Pertama
+def check_guardrail_logic(state: AgentState):
+    if state.get("is_topic_allowed", True):
+        return "router"
+    return "out_of_topic"
+
 def route_logic(state: AgentState):
     ctx = state["context"]
     if ctx == "vectorstore":
@@ -487,9 +548,13 @@ def route_logic(state: AgentState):
         return "chitchat"
 
 # ==========================================
-# Graph Architecture Setup
+# Graph Architecture Setup (MODIFIED)
 # ==========================================
 workflow = StateGraph(AgentState)
+
+# Daftarkan node guardrail baru
+workflow.add_node("guardrail", guardrail_node)
+workflow.add_node("out_of_topic", out_of_topic_node)
 
 workflow.add_node("router", router_node)
 workflow.add_node("chitchat", chitchat_node)
@@ -500,7 +565,14 @@ workflow.add_node("generate_answer", generate_answer_node)
 workflow.add_node("fetch_summary", fetch_summary_node)
 workflow.add_node("service_capture", service_capture_node)
 
-workflow.set_entry_point("router")
+# UBAH ENTRY POINT: Masuk ke Guardrail terlebih dahulu
+workflow.set_entry_point("guardrail")
+
+# Tambahkan percabangan bersyarat dari Guardrail
+workflow.add_conditional_edges("guardrail", check_guardrail_logic, {
+    "router": "router",
+    "out_of_topic": "out_of_topic"
+})
 
 workflow.add_conditional_edges("router", route_logic, {
     "expand_query": "expand_query",
@@ -521,12 +593,10 @@ workflow.add_edge("generate_answer", END)
 workflow.add_edge("fetch_summary", END) 
 workflow.add_edge("service_capture", END) 
 workflow.add_edge("chitchat", END)
+workflow.add_edge("out_of_topic", END) # Jika di luar topik, alur langsung selesai di sini.
 
 
 from langgraph.checkpoint.memory import MemorySaver
 
-# Buat instansiasi in-memory checkpointer
 memory = MemorySaver()
-
-# Kompilasi workflow dengan checkpointer lokal (tanpa perlu setup database)
 agent_app = workflow.compile(checkpointer=memory)
