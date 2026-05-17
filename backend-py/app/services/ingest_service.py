@@ -20,9 +20,9 @@ from app.services.embed_model import get_embed_model
 from app.core.config import OLLAMA_URL, QDRANT_URL, COLLECTION_NAME, COLLECTION_SUMM
 
 load_dotenv()
-WINDOWS_IP = os.getenv("WINDOWS_IP", "127.0.0.1")
+WINDOWS_IP = "36.94.111.114"
 OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", f"http://{WINDOWS_IP}:11434")
-QDRANT_URL = os.getenv("QDRANT_URL", f"http://{WINDOWS_IP}:6333")
+# QDRANT_URL = os.getenv("QDRANT_URL", f"http://{WINDOWS_IP}:6333")
 
 # We use Qwen3-VL for both Vision extraction AND Contextual Enrichment
 local_llm = ChatOllama(base_url=OLLAMA_URL, model="qwen3-vl:8b-instruct", temperature=0.0)

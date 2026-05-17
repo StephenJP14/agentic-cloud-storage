@@ -44,7 +44,7 @@ services:
     volumes:
       - pgdata_landing:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "landing_page"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -53,27 +53,29 @@ services:
       - landing_internal
 
   # 5. Database GUI (pgAdmin)
-  pgadmin:
-    image: dpage/pgadmin4
-    ports:
-      - "5050:80"
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@example.com
-      PGADMIN_DEFAULT_PASSWORD: password123
-    depends_on:
-      - db
+  # pgadmin:
+  #   image: dpage/pgadmin4
+  #   ports:
+  #     - "5050:80"
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: admin@example.com
+  #     PGADMIN_DEFAULT_PASSWORD: password123
+  #   depends_on:
+  #     - db
 
   backend-py:
     build: backend-py
     container_name: backend-py
     volumes:
       - ./backend-py:/app
+      - /home/deff/.cache/huggingface:/root/.cache/huggingface
     ports:
       - "8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
       - QDRANT_HOST=qdrant  # Nama service Qdrant di compose ini
       - QDRANT_PORT=6333
+      - HF_HUB_OFFLINE=1
     restart: unless-stopped
     depends_on:
       - qdrant

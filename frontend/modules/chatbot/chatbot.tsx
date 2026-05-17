@@ -99,7 +99,7 @@ export default function Chatbot() {
         <div className="fixed right-6 md:right-12 bottom-6 md:bottom-12 z-[9999] flex flex-col items-end">
             {/* Window Chat */}
             {isOpen && (
-                <div className="mb-4 w-80 sm:w-96 h-[450px] bg-white rounded-2xl shadow-xl flex flex-col border border-gray-100 overflow-hidden transition-all duration-300">
+                <div className="mb-4 w-90 sm:w-96 h-[650px] bg-white rounded-2xl shadow-xl flex flex-col border border-gray-100 overflow-hidden transition-all duration-300">
                     {/* Header */}
                     <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50">
                         <span className="font-semibold text-gray-800">Chatbot</span>
@@ -139,7 +139,7 @@ export default function Chatbot() {
 
                     {/* Input */}
                     <div className="p-4 border-t border-gray-50 flex gap-2 items-center bg-white">
-                        <input
+                        <textarea
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}

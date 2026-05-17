@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MINIO_HOST = os.getenv("WINDOWS_IP", "localhost")
+MINIO_HOST = "36.94.111.114"
 MINIO_PORT = os.getenv("MINIO_PORT", "9000")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "admin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "password123")
