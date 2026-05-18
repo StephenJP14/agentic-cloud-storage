@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
-"""
-Lightweight evaluation script that invokes the existing router_chain in
-`app.services.agent` and optionally sends events to Langfuse.
 
-This script deliberately does not modify runtime model code.
-"""
-
+import json
 import os
 import sys
 import time
-import uuid
+from typing import Any
+
+from langfuse import Langfuse
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT)
@@ -17,17 +14,27 @@ sys.path.insert(0, ROOT)
 try:
     from app.services import agent
 except Exception as e:
-    print("Failed importing agent module:", e)
-    raise
+    raise RuntimeError(f"Failed importing agent module: {e}") from e
 
-import httpx
-import json
-from typing import Any, Optional
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None
 
-LANGFUSE_URL = os.getenv("LANGFUSE_URL", "").rstrip("/")
-LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY", "")
-LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY", "")
-DATASET_FILE = os.getenv("DATASET_FILE", os.path.join(os.path.dirname(__file__), "dataset.json"))
+
+# =========================================================
+# CONFIG
+# =========================================================
+
+DATASET_FILE = os.getenv(
+    "DATASET_FILE",
+    os.path.join(os.path.dirname(__file__), "dataset.json"),
+)
+
+CHART_OUTPUT_FILE = os.path.join(
+    os.path.dirname(__file__),
+    "route_success_rates.png"
+)
 
 ROUTE_NAME_MAP = {
     "vectorstore": "rag_qa",
@@ -37,168 +44,292 @@ ROUTE_NAME_MAP = {
 }
 
 
+# =========================================================
+# LANGFUSE
+# =========================================================
+
+def init_langfuse() -> Langfuse:
+    return Langfuse(
+        public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+        secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+        host=os.getenv("LANGFUSE_URL", "").rstrip("/"),
+    )
+
+
+# =========================================================
+# DATASET
+# =========================================================
+
 def load_dataset(path: str) -> list[dict]:
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except FileNotFoundError:
         raise SystemExit(f"Dataset file not found: {path}")
-    except json.JSONDecodeError as exc:
-        raise SystemExit(f"Invalid JSON in dataset file {path}: {exc}")
+    except json.JSONDecodeError as e:
+        raise SystemExit(f"Invalid JSON dataset: {e}")
 
 
-DATASET = load_dataset(DATASET_FILE)
+# =========================================================
+# HELPERS
+# =========================================================
 
-
-
-def send_langfuse(event_type: str, data: dict, trace_id: Optional[str] = None):
-    """Send trace event to Langfuse using public/secret key auth."""
-    if not LANGFUSE_URL or not LANGFUSE_PUBLIC_KEY or not LANGFUSE_SECRET_KEY:
-        print("[langfuse] disabled - set LANGFUSE_URL, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY")
-        return
-    try:
-        endpoint = f"{LANGFUSE_URL}/api/events"
-        headers = {"Content-Type": "application/json"}
-        payload = {
-            "id": trace_id or str(uuid.uuid4()),
-            "type": event_type,
-            **data
-        }
-        # Use Basic auth with public_key:secret_key
-        auth = (LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY)
-        resp = httpx.post(endpoint, json=payload, auth=auth, timeout=5)
-        if resp.status_code >= 400:
-            print(f"[langfuse] error {resp.status_code}: {resp.text}")
-    except Exception as e:
-        print(f"[langfuse] failed to send {event_type}:", e)
-
-
-def map_decision(raw: str) -> str:
+def map_decision(raw: Any) -> str:
     if raw is None:
         return "unknown"
-    return ROUTE_NAME_MAP.get(raw, raw)
+
+    return ROUTE_NAME_MAP.get(str(raw), str(raw))
 
 
-def extract_tool_calls(output: Any) -> list[dict]:
-    """Extract tool calls from router output if available."""
-    tools = []
-    
-    # Try various ways to extract tool information from LangChain output
-    if isinstance(output, dict):
-        # Check for steps/intermediate_steps
-        if "steps" in output:
-            tools = output["steps"]
-        elif "intermediate_steps" in output:
-            tools = output["intermediate_steps"]
-        # Check for tool_calls
-        if "tool_calls" in output:
-            for call in output["tool_calls"]:
-                tools.append({"tool": call.get("name"), "args": call.get("args")})
-    elif hasattr(output, "intermediate_steps"):
-        tools = list(output.intermediate_steps)
-    
-    return tools
-
-
-def calculate_detailed_metrics(results: list[dict]) -> dict:
-    """Calculate quantifiable metrics beyond pass/fail rate."""
+def calculate_metrics(results: list[dict]) -> dict:
     total = len(results)
     passed = sum(1 for r in results if r["pass"])
-    failed = total - passed
-    
-    # Categorize failures
-    failure_categories = {}
+
+    failures_by_type = {}
+
     for r in results:
         if not r["pass"]:
-            expected = r.get("expected", "unknown")
-            if expected not in failure_categories:
-                failure_categories[expected] = 0
-            failure_categories[expected] += 1
-    
-    # Tool call statistics
-    tools_invoked = []
-    for r in results:
-        if "tools" in r:
-            tools_invoked.extend([t.get("tool") for t in r["tools"] if t.get("tool")])
-    
-    tool_frequency = {}
-    for tool in tools_invoked:
-        tool_frequency[tool] = tool_frequency.get(tool, 0) + 1
-    
+            expected = r["expected"]
+            failures_by_type[expected] = (
+                failures_by_type.get(expected, 0) + 1
+            )
+
     return {
-        "total_tests": total,
+        "total": total,
         "passed": passed,
-        "failed": failed,
-        "pass_rate": passed / total if total > 0 else 0,
-        "failures_by_expected_type": failure_categories,
-        "tools_invoked_count": len(tools_invoked),
-        "unique_tools": len(tool_frequency),
-        "tool_frequency": tool_frequency,
+        "failed": total - passed,
+        "pass_rate": passed / total if total else 0.0,
+        "failures_by_expected_type": failures_by_type,
     }
 
 
+def calculate_route_success_rates(results: list[dict]) -> dict:
+    stats = {}
+
+    for r in results:
+        route = r["expected"]
+
+        if route not in stats:
+            stats[route] = {
+                "total": 0,
+                "passed": 0
+            }
+
+        stats[route]["total"] += 1
+
+        if r["pass"]:
+            stats[route]["passed"] += 1
+
+    for route in stats:
+        total = stats[route]["total"]
+        passed = stats[route]["passed"]
+
+        stats[route]["success_rate"] = (
+            passed / total if total else 0.0
+        )
+
+    return stats
+
+
+# =========================================================
+# CHART
+# =========================================================
+
+def plot_route_success_rates(
+    results: list[dict],
+    output_path: str = CHART_OUTPUT_FILE
+):
+    if plt is None:
+        print("[chart] matplotlib not installed")
+        return None
+
+    stats = calculate_route_success_rates(results)
+
+    labels = list(stats.keys())
+    rates = [
+        stats[label]["success_rate"] * 100
+        for label in labels
+    ]
+
+    totals = [
+        stats[label]["total"]
+        for label in labels
+    ]
+
+    passed_counts = [
+        stats[label]["passed"]
+        for label in labels
+    ]
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    bars = ax.bar(labels, rates)
+
+    ax.set_ylim(0, 100)
+    ax.set_ylabel("Success Rate (%)")
+    ax.set_xlabel("Route")
+    ax.set_title("Route Classification Success Rate")
+
+    for bar, total, passed in zip(
+        bars,
+        totals,
+        passed_counts
+    ):
+        height = bar.get_height()
+
+        ax.annotate(
+            f"{height:.0f}%\n({passed}/{total})",
+            xy=(
+                bar.get_x() + bar.get_width() / 2,
+                height
+            ),
+            xytext=(0, 8),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontsize=9
+        )
+
+    plt.tight_layout()
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)
+
+    print(f"[chart] Saved chart -> {output_path}")
+
+    return output_path
+
+
+# =========================================================
+# EVALUATION
+# =========================================================
+
 def evaluate():
+    dataset = load_dataset(DATASET_FILE)
+
+    lf = init_langfuse()
+
     router = agent.router_chain
+
     results = []
-    trace_id = str(uuid.uuid4())
-    
-    for sample in DATASET:
+
+    print("=" * 60)
+    print("STARTING ROUTER EVALUATION")
+    print("=" * 60)
+
+    for idx, sample in enumerate(dataset, start=1):
         message = sample["input"]
         expected = sample["expected_route"]
-        req_id = str(uuid.uuid4())
-        print(f"\n[eval] request_id={req_id} message={message!r} expected={expected}")
+
+        print(f"\n[{idx}] Input     : {message}")
+        print(f"[{idx}] Expected  : {expected}")
+
+        trace = lf.trace(
+            name="router-eval",
+            input={
+                "question": message
+            },
+            metadata={
+                "expected_route": expected
+            }
+        )
+
         try:
-            out = router.invoke({"question": message})
-            raw = getattr(out, "datasource", None) or (out.get("datasource") if isinstance(out, dict) else None)
-            tools = extract_tool_calls(out)
+            out = router.invoke({
+                "question": message
+            })
+
+            raw = getattr(out, "datasource", None)
+
+            if raw is None and isinstance(out, dict):
+                raw = out.get("datasource")
+
+            actual = map_decision(raw)
+
+            passed = actual == expected
+
+            trace.update(
+                output={
+                    "actual_route": actual,
+                    "passed": passed
+                }
+            )
+
+            trace.score(
+                name="route_correctness",
+                value=1 if passed else 0
+            )
+
         except Exception as e:
-            print("Router invocation failed:", e)
-            raw = "error"
-            tools = []
-        
-        mapped = map_decision(raw)
-        passed = (mapped == expected)
-        rec = {
-            "request_id": req_id,
-            "trace_id": trace_id,
+            actual = "error"
+            passed = False
+
+            trace.update(
+                output={
+                    "actual_route": actual,
+                    "passed": passed,
+                    "error": str(e)
+                }
+            )
+
+            trace.score(
+                name="route_correctness",
+                value=0
+            )
+
+            print(f"[{idx}] ERROR     : {e}")
+
+        result = {
             "input": message,
             "expected": expected,
-            "actual": mapped,
-            "pass": passed,
-            "tools": tools,
-            "tool_count": len(tools),
+            "actual": actual,
+            "pass": passed
         }
-        results.append(rec)
-        print(f" -> actual: {mapped} (pass: {passed}) | tools invoked: {len(tools)}")
-        
-        # Send individual result
-        send_langfuse("routing.eval", {
-            "request_id": req_id,
-            "input": message,
-            "expected": expected,
-            "actual": mapped,
-            "passed": passed,
-            "tools_count": len(tools),
-            "tools": [t.get("tool") if isinstance(t, dict) else str(t) for t in tools],
-        }, trace_id=req_id)
-        time.sleep(0.5)
 
-    # Calculate and send detailed metrics
-    metrics = calculate_detailed_metrics(results)
-    print(f"\n{'='*60}")
-    print(f"EVALUATION METRICS")
-    print(f"{'='*60}")
-    print(f"Pass Rate: {metrics['passed']}/{metrics['total_tests']} ({metrics['pass_rate']:.1%})")
-    print(f"Tools Invoked (total): {metrics['tools_invoked_count']}")
-    print(f"Unique Tools: {metrics['unique_tools']}")
-    if metrics['tool_frequency']:
-        print(f"Tool Frequency: {metrics['tool_frequency']}")
-    if metrics['failures_by_expected_type']:
-        print(f"Failures by Type: {metrics['failures_by_expected_type']}")
-    print(f"{'='*60}")
-    
-    send_langfuse("routing.eval_summary", metrics, trace_id=trace_id)
+        results.append(result)
 
+        print(f"[{idx}] Actual     : {actual}")
+        print(f"[{idx}] Pass       : {passed}")
+
+        time.sleep(0.2)
+
+    metrics = calculate_metrics(results)
+
+    print("\n" + "=" * 60)
+    print("FINAL METRICS")
+    print("=" * 60)
+
+    print(f"Total Tests : {metrics['total']}")
+    print(f"Passed      : {metrics['passed']}")
+    print(f"Failed      : {metrics['failed']}")
+    print(f"Pass Rate   : {metrics['pass_rate']:.2%}")
+
+    if metrics["failures_by_expected_type"]:
+        print("\nFailures By Route:")
+        for route, count in metrics["failures_by_expected_type"].items():
+            print(f"- {route}: {count}")
+
+    chart_path = plot_route_success_rates(results)
+
+    summary_trace = lf.trace(
+        name="router-eval-summary",
+        input={
+            "dataset_size": len(dataset)
+        },
+        output=metrics,
+        metadata={
+            "chart_path": chart_path
+        }
+    )
+
+    lf.flush()
+
+    print("\nLangfuse traces flushed successfully.")
+    print("=" * 60)
+
+
+# =========================================================
+# MAIN
+# =========================================================
 
 if __name__ == "__main__":
     evaluate()

@@ -110,5 +110,69 @@
   {
     "input": "Laptop saya sering hang saat main game, solusinya apa ya?",
     "expected_route": "rag_qa"
+  },
+  {
+    "input": "Apakah laptop Zyrex saya bisa dipasang dua monitor eksternal?",
+    "expected_route": "rag_qa"
+  },
+  {
+    "input": "Bagaimana cara update driver di laptop Zyrex?",
+    "expected_route": "rag_qa"
+  },
+  {
+    "input": "Apakah ada fitur keamanan khusus di laptop Zyrex untuk melindungi data saya?",
+    "expected_route": "chit_chat"
+  },
+  {
+    "input": "Apakah laptop Zyrex saya bisa dipasang RAM lebih dari 16GB?",
+    "expected_route": "chit_chat"
+  },
+  {
+    "input": "Bagaimana cara mengatasi layar laptop Zyrex saya yang berkedip-kedip?",
+    "expected_route": "rag_qa"
+  },
+  {
+    "input": "Saya butuh service laptop, bisa bantu buatkan tiket?",
+    "expected_route": "create_ticket"
+  },
+  {
+    "input": "Apakah disini ada layanan untuk service laptop?",
+    "expected_route": "create_ticket"
+  },
+  {
+    "input": "Laptop saya rusak, bagaimana cara booking service?",
+    "expected_route": "create_ticket"
+  },
+  {
+    "input": "Saya ingin buat jadwal servis untuk laptop saya",
+    "expected_route": "create_ticket"
+  },
+  {
+    "input": "Kenapa di landing page tidak bisa buat service booking?",
+    "expected_route": "create_ticket"
+  },
+  {
+    "input": "Apakah saya bisa langsung booking service lewat sini?",
+    "expected_route": "create_ticket"
+  },
+  {
+    "input": "Apakah ada promo untuk service laptop Zyrex bulan ini?",
+    "expected_route": "chit_chat"
+  },
+  {
+    "input": "kenapa laptop zyrex burik?",
+    "expected_route": "chit_chat"
+  },
+  {
+    "input": "Laptop zyrex saya lemot banget, padahal baru beli 2 bulan yang lalu!",
+    "expected_route": "rag_qa"
+  },
+  {
+    "input": "laptop saya mati total, tolong bantu service",
+    "expected_route": "create_ticket"
+  },
+  {
+    "input": "apakah ada sarana untuk booking service laptop zyrex lewat website?",
+    "expected_route": "create_ticket"
   }
 ]
