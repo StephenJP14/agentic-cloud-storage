@@ -68,7 +68,7 @@ services:
     container_name: backend-py
     volumes:
       - ./backend-py:/app
-      - /home/deff/.cache/huggingface:/root/.cache/huggingface
+      - ~/.cache/huggingface:/root/.cache/huggingface
     ports:
       - "8000:8000"
     environment:

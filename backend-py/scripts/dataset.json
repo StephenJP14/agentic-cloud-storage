@@ -1,0 +1,114 @@
+[
+  {
+    "input": "Halo",
+    "expected_route": "chit_chat"
+  },
+  {
+    "input": "Thanks ya bantuannya",
+    "expected_route": "chit_chat"
+  },
+  {
+    "input": "Cara menaikkan brightness laptop Zyrex gimana?",
+    "expected_route": "rag_qa"
+  },
+  {
+    "input": "Laptop saya bluescreen terus pas dinyalakan",
+    "expected_route": "rag_qa"
+  },
+  {
+    "input": "HDMI laptop saya gak detect monitor",
+    "expected_route": "rag_qa"
+  },
+  {
+    "input": "Boleh dibantu booking service",
+    "expected_route": "create_ticket"
+  },
+  {
+    "input": "Ya saya mau buat jadwal service",
+    "expected_route": "create_ticket"
+  },
+  {
+    "input": "Silakan lanjut buat tiketnya",
+    "expected_route": "create_ticket"
+  },
+  {
+    "input": "Oke tolong daftarkan servis",
+    "expected_route": "create_ticket"
+  },
+  {
+    "input": "Nama: Budi\nPhone: 08123456789\nEmail: budi@gmail.com\nAddress: Jakarta",
+    "expected_route": "create_ticket"
+  },
+  {
+    "input": "Saya mau booking service untuk tanggal 10 Oktober 2024",
+    "expected_route": "create_ticket"
+  },
+  {
+    "input": "Kenapa laptop saya sering panas ya?",
+    "expected_route": "rag_qa"
+  },
+  {
+    "input": "Apakah laptop Zyrex saya bisa diupgrade RAM-nya?",
+    "expected_route": "rag_qa"
+  },
+  {
+    "input": "Laptop saya sering restart sendiri, kenapa ya?",
+    "expected_route": "rag_qa"
+  },
+  {
+    "input": "Bagaimana cara reset password BIOS di laptop Zyrex?",
+    "expected_route": "rag_qa"
+  },
+  {
+    "input": "Apakah ada garansi untuk kerusakan akibat air?",
+    "expected_route": "rag_qa"
+  },
+  {
+    "input": "Laptop saya gak bisa connect ke WiFi, solusinya apa ya?",
+    "expected_route": "rag_qa"
+  },
+  {
+    "input": "Apakah laptop Zyrex saya bisa dipasang SSD?",
+    "expected_route": "rag_qa"
+  },
+  {
+    "input": "Hi apa kabar tim zyrex?",
+    "expected_route": "chit_chat"
+  },
+  {
+    "input": "Terima kasih banyak ya atas bantuannya!",
+    "expected_route": "chit_chat"
+  },
+  {
+    "input": "Oke terima kasih, sudah dibantuin",
+    "expected_route": "chit_chat"
+  },
+  {
+    "input": "Makasih ya infonya, sangat membantu!",
+    "expected_route": "chit_chat"
+  },
+  {
+    "input": "Tidak memuaskan, service payah!",
+    "expected_route": "chit_chat"
+  },
+  {
+    "input": "Laptop saya mati total, kenapa ya?",
+    "expected_route": "rag_qa"
+  },
+  {
+    "input": "Apakah laptop Zyrex saya bisa dipasang kartu grafis eksternal (eGPU)?",
+    "expected_route": "rag_qa"
+  },
+  {
+    "input": "Bagaimana cara membersihkan kipas pendingin laptop Zyrex?",
+    "expected_route": "rag_qa"
+  },
+  {
+    "input": "Apakah ada software bawaan untuk optimasi performa di laptop Zyrex?",
+    "expected_route": "rag_qa"
+  },
+  {
+    "input": "Laptop saya sering hang saat main game, solusinya apa ya?",
+    "expected_route": "rag_qa"
+  }
+]
