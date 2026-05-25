@@ -113,6 +113,7 @@ router_chain = router_prompt | llm.with_structured_output(RouteQuery)
 # ==========================================
 class AgentState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
+    awaiting_booking_confirmation: bool
     context: str
     file_url: str
     search_queries: list[str]
@@ -187,7 +188,15 @@ def router_node(state: AgentState):
     
     # PERBAIKAN DI SINI: Masuk ke service_capture JIKA (AI menawarkan DAN direspon positif), 
     # ATAU memang user minta booking langsung, ATAU user langsung kirim data form.
-    if (ai_offered and is_positive_respond) or is_direct_booking_intent or is_submitting_form:
+    if (
+    state.get("is_booking_mode", False)
+    or is_submitting_form
+    or is_direct_booking_intent
+    or (
+        state.get("awaiting_booking_confirmation", False)
+        and is_positive_respond
+    )
+):
         print("🧭 [ROUTER] HARD LOCK TRIGGERED: Masuk ke node service_capture.")
         return {"context": "service_capture"}
         
@@ -228,8 +237,15 @@ def chitchat_node(state: AgentState):
     # Menggunakan prompt template agar instruksi system tidak dilanggar oleh LLM
     prompt = chitchat_prompt.format_messages(last_message=last_message)
     response = llm.invoke(prompt).content
-    
-    return {"messages": [AIMessage(content=response)]}
+    offer_booking = (
+    "Apakah Anda ingin saya bantu buatkan jadwal (booking) service"
+    in response
+)
+
+    return {
+        "messages": [AIMessage(content=response)],
+        "awaiting_booking_confirmation": offer_booking
+    }
 
 # ==========================================
 # Prompt Builder & Generator untuk RAG
@@ -436,9 +452,10 @@ def service_capture_node(state: AgentState):
         feedback = "Terjadi kesalahan jaringan saat mengirim data servis Anda."
 
     return {
-        "messages": [AIMessage(content=feedback)],
-        "is_booking_mode": False,
-        "extracted_form_data": None
+        "messages": [AIMessage(content=bot_message)],
+        "is_booking_mode": True,
+        "awaiting_booking_confirmation": False,
+        "extracted_form_data": form_data
     }
 
 # ==========================================
