@@ -203,14 +203,33 @@ def router_node(state: AgentState):
     return {"context": decision}
 
 # ==========================================
-# NODE: Chitchat
+# Chitchat (Kunci Karakter CS Zyrex)
 # ==========================================
+chitchat_prompt = ChatPromptTemplate.from_messages([
+    ("system", """Anda adalah Tech Support & Customer Service Assistant resmi dari Zyrex.
+Tugas Anda HANYA merespon sapaan, ucapan terima kasih, atau obrolan ringan (chitchat) dari pelanggan dengan ramah, sopan, dan singkat.
+
+PANDUAN KETAT:
+1. JANGAN PERNAH menawarkan bantuan di luar produk Zyrex (seperti menawarkan bantuan tugas sekolah, proyek, coding, matematika, dll).
+2. Selalu posisikan diri Anda sebagai representatif Zyrex yang siap membantu terkait kendala laptop/PC atau informasi layanan service center Zyrex.
+3. Jawab dengan singkat, ramah, dan arahkan user secara halus jika mereka ingin menanyakan kendala perangkat mereka.
+
+Contoh Respon yang Benar:
+- "Halo! Selamat datang di Tech Support Zyrex. Ada yang bisa saya bantu terkait perangkat Zyrex Anda hari ini?"
+- "Sama-sama! Terima kasih telah menghubungi Service Center Zyrex. Semoga hari Anda menyenangkan!"
+"""),
+    ("human", "{last_message}")
+])
+
 def chitchat_node(state: AgentState):
     last_message = state["messages"][-1].content
-    prompt = f"Anda adalah Tech Support Assistant Laptop Zyrex. Jawab sapaan ramah ini secara singkat: {last_message}"
+    print(f"💬 [CHITCHAT] Memproses sapaan: '{last_message}'")
+    
+    # Menggunakan prompt template agar instruksi system tidak dilanggar oleh LLM
+    prompt = chitchat_prompt.format_messages(last_message=last_message)
     response = llm.invoke(prompt).content
+    
     return {"messages": [AIMessage(content=response)]}
-
 # ==========================================
 # Prompt Builder & Generator untuk RAG
 # ==========================================
