@@ -16,7 +16,22 @@ export default function Chatbot() {
     const [input, setInput] = useState("");
     const [messages, setMessages] = useState<Message[]>([]);
     const [isTyping, setIsTyping] = useState(false);
+    const [threadId, setThreadId] = useState<string>("");
+
     const scrollRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        let currentSessionId = sessionStorage.getItem("zyrex_chat_session");
+
+        if (!currentSessionId) {
+            currentSessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+            // Simpan ke storage browser agar tidak hilang saat halaman di-refresh
+            sessionStorage.setItem("zyrex_chat_session", currentSessionId);
+        }
+
+        setThreadId(currentSessionId);
+        console.log(`🎟️ [ACTIVE SESSION] Thread ID: ${currentSessionId}`);
+    }, []);
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -37,7 +52,10 @@ export default function Chatbot() {
             const response = await fetch("http://localhost:8000/chat/stream", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: userMsg, thread_id: "session-1" }),
+                body: JSON.stringify({ 
+                    message: userMsg, 
+                    thread_id: threadId
+                }),
             });
 
             if (!response.body) return;
@@ -121,8 +139,6 @@ export default function Chatbot() {
                                     }`}>
                                     {msg.status && <span className="text-[10px] block opacity-70 animate-pulse">{msg.status}</span>}
 
-                                    {/* Markdown Rendering Logic */}
-                                    {/* Markdown Rendering Logic */}
                                     {msg.role === 'bot' ? (
                                         <div className="markdown-body space-y-2 [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>table]:w-full [&>table]:border-collapse [&_th]:border [&_th]:p-1 [&_td]:border [&_td]:p-1">
                                             <ReactMarkdown remarkPlugins={[remarkGfm]}>

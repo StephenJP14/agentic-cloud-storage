@@ -20,7 +20,7 @@ async def chat_stream(request: ChatRequest):
     """
     def generate():
         try:
-            with RedisSaver.from_conn_string(REDIS_URL) as checkpointer:
+            with RedisSaver.from_conn_string(REDIS_URL, ttl={"default_ttl": 86400}) as checkpointer:
                 agent_app = workflow.compile(checkpointer=checkpointer)
                 config = {"configurable": {"thread_id": request.thread_id}}
                 
@@ -107,7 +107,7 @@ async def chat_endpoint(request: ChatRequest):
     Non-streaming endpoint.
     """
     try:
-        with RedisSaver.from_conn_string(REDIS_URL) as checkpointer:
+        with RedisSaver.from_conn_string(REDIS_URL, ttl={"default_ttl": 86400}) as checkpointer:
             agent_app = workflow.compile(checkpointer=checkpointer)
             config = {"configurable": {"thread_id": request.thread_id}}
             

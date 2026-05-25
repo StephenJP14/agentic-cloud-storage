@@ -230,15 +230,31 @@ Contoh Respon yang Benar:
     ("human", "{last_message}")
 ])
 
+# ==========================================
+# REVISI TOTAL NODE: Chitchat (Anti-Bocor)
+# ==========================================
 def chitchat_node(state: AgentState):
     last_message = state["messages"][-1].content
     print(f"💬 [CHITCHAT] Memproses sapaan: '{last_message}'")
     
-    # Menggunakan prompt template agar instruksi system tidak dilanggar oleh LLM
-    prompt = chitchat_prompt.format_messages(last_message=last_message)
-    response = llm.invoke(prompt).content
+    messages = [
+        SystemMessage(content=(
+            "Anda adalah Tech Support & Customer Service Assistant resmi dari Zyrex.\n"
+            "Tugas Anda HANYA membalas sapaan (chitchat) pelanggan dengan ramah, singkat, dan sopan.\n\n"
+            "ATURAN MUTLAK:\n"
+            "1. JANGAN PERNAH menawarkan bantuan proyek, tugas sekolah, coding, matematika, esai, atau topik umum lainnya.\n"
+            "2. Selalu batasi diri Anda hanya untuk membalas sapaan dan tawarkan bantuan terkait kendala laptop/PC Zyrex atau booking service.\n"
+            "3. Maksimal jawaban adalah 2 kalimat.\n\n"
+            "Contoh jawaban yang benar:\n"
+            "'Halo! Selamat datang di Tech Support Zyrex. Ada yang bisa saya bantu terkait perangkat Zyrex Anda?'"
+        )),
+        HumanMessage(content=last_message)
+    ]
+    
+    response = llm.invoke(messages).content
     
     return {"messages": [AIMessage(content=response)]}
+
 # ==========================================
 # Prompt Builder & Generator untuk RAG
 # ==========================================
@@ -534,8 +550,28 @@ def search_node(state: AgentState):
     
     original_query = state["messages"][-1].content
     reranked_docs = compressor.compress_documents(documents=retrieved_docs, query=original_query)
+    
     file_url = reranked_docs[0].metadata.get("file_url", "") if reranked_docs else ""
-    return {"retrieved_docs": list(reranked_docs), "file_url": file_url}
+    
+    cleaned_docs = []
+    for doc in reranked_docs:
+        safe_metadata = {}
+        for k, v in doc.metadata.items():
+            # Cek jika nilai memiliki atribut .item() (artinya tipe data NumPy seperti float32/int64)
+            if hasattr(v, "item"):  
+                safe_metadata[k] = v.item()  # Konversi paksa ke float/int asli Python
+            elif isinstance(v, list):
+                # Bersihkan juga jika ada array/list yang di dalamnya mengandung unsur NumPy
+                safe_metadata[k] = [x.item() if hasattr(x, "item") else x for x in v]
+            else:
+                safe_metadata[k] = v
+                
+        cleaned_docs.append({
+            "page_content": doc.page_content,
+            "metadata": safe_metadata
+        })
+
+    return {"retrieved_docs": cleaned_docs, "file_url": file_url}
 
 def grade_context_node(state: AgentState):
     docs = state["retrieved_docs"]
