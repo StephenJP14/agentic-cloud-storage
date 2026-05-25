@@ -237,16 +237,8 @@ def chitchat_node(state: AgentState):
     # Menggunakan prompt template agar instruksi system tidak dilanggar oleh LLM
     prompt = chitchat_prompt.format_messages(last_message=last_message)
     response = llm.invoke(prompt).content
-    offer_booking = (
-    "Apakah Anda ingin saya bantu buatkan jadwal (booking) service"
-    in response
-)
-
-    return {
-        "messages": [AIMessage(content=response)],
-        "awaiting_booking_confirmation": offer_booking
-    }
-
+    
+    return {"messages": [AIMessage(content=response)]}
 # ==========================================
 # Prompt Builder & Generator untuk RAG
 # ==========================================
